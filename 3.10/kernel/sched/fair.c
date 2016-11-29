@@ -7450,15 +7450,16 @@ static unsigned int hmp_idle_pull(int this_cpu)
 	unsigned int force = 0;
 	struct task_struct *p = NULL;
 
-	if (!hmp_cpu_is_slowest(this_cpu))
-		hmp_domain = hmp_slower_domain(this_cpu);
+	if (!hmp_cpu_is_slowest(this_cpu))      /*  检查当前 CPU 是不是大核 */
+		hmp_domain = hmp_slower_domain(this_cpu);   /*  如果是大核(不是小核), 则取出小核的 domain 结构*/
 	if (!hmp_domain)
 		return 0;
 
-	if (!spin_trylock(&hmp_force_migration))
+	if (!spin_trylock(&hmp_force_migration))    /*  加锁    */
 		return 0;
 
-	/* first select a task */
+	/* first select a task
+     * for循环遍历小核调度域上的所有 CPU, 找出该 CPU 的运行队列中负载最重的进程 curr    */
 	for_each_cpu(cpu, &hmp_domain->cpus) {
 		rq = cpu_rq(cpu);
 		raw_spin_lock_irqsave(&rq->lock, flags);
@@ -7480,7 +7481,7 @@ static unsigned int hmp_idle_pull(int this_cpu)
 			}
 		}
 		orig = curr;
-		curr = hmp_get_heaviest_task(curr, this_cpu);   /*  从当前CPU中找到负载最大(即最繁忙)的那个进程*/
+		curr = hmp_get_heaviest_task(curr, this_cpu);   /*  从当前CPU中找到负载最大(即最繁忙)的那个进程 */
 		/* check if heaviest eligible task on this
 		 * CPU is heavier than previous task
 		 */
@@ -7558,8 +7559,8 @@ static void run_rebalance_domains(struct softirq_action *h)
      *  那么这样正好可以适合把该进程迁移到大核的空闲CPU上
      * */
 	if (unlikely(this_rq->wake_for_idle_pull)) {
-		this_rq->wake_for_idle_pull = 0;    /*  */
-		if (hmp_idle_pull(this_cpu)) {
+		this_rq->wake_for_idle_pull = 0;    /*  清楚大核上的 wake_for_idle_pull 标示 */
+		if (hmp_idle_pull(this_cpu)) {      /*  */
 			/* break out unless running nohz idle as well */
 			if (idle != CPU_IDLE)
 				return;
