@@ -307,6 +307,15 @@ static bool is_little_cpu(struct device_node *cn)
 	return false;
 }
 
+/*  arch_get_fast_and_slow_cpus( ) 去获取系统中大小核 CPU 的 index.
+ *  这里分别为大小核定义了 domain,
+ *  把小核的 CPUs 放到小核的 domain 上,大核 CPUs 放到大核 domain 上,
+ *  然后加入到全局链表 hmp_domains_list.
+ *
+ *  查询哪些 CPU 是大小核, HMP 调度器实现了两种方式,
+ *  一个是在 CONFIG 中定义,
+ *  另外一个是通过 DTS
+ *  */
 void __init arch_get_fast_and_slow_cpus(struct cpumask *fast,
 					struct cpumask *slow)
 {
@@ -319,6 +328,8 @@ void __init arch_get_fast_and_slow_cpus(struct cpumask *fast,
 	/*
 	 * Use the config options if they are given. This helps testing
 	 * HMP scheduling on systems without a big.LITTLE architecture.
+     *
+     * 通过设置CONFIG_HMP_FAST_CPU_MASK和CONFIG_HMP_SLOW_CPU_MASK可以设置大小核信息
 	 */
 	if (strlen(CONFIG_HMP_FAST_CPU_MASK) && strlen(CONFIG_HMP_SLOW_CPU_MASK)) {
 		if (cpulist_parse(CONFIG_HMP_FAST_CPU_MASK, fast))
@@ -330,6 +341,9 @@ void __init arch_get_fast_and_slow_cpus(struct cpumask *fast,
 
 	/*
 	 * Else, parse device tree for little cores.
+     *
+     * 从 DTS 中读取CPU, 然后判断该 CPU 是否小核,
+     * 如果是的话把该 CPU 加入 slow 的 cpumask 位图中
 	 */
 	while ((cn = of_find_node_by_type(cn, "cpu"))) {
 
@@ -349,6 +363,15 @@ void __init arch_get_fast_and_slow_cpus(struct cpumask *fast,
 			break;
 		}
 
+        /*  判断该 从 DTS 中读取到的 CPU 是否小核,
+         *  如果是的话把该 CPU 加入 slow 小核 的 cpumask 位图中
+         *  否则的话, 把该 CPU 加入 fast 大核 的 cpumask 位图中
+         *  这里判断是否小核主要是查表 little_cores[],
+         *  ARM32 处理器中 Cortex-A7  是小核,
+         *  ARM64 处理器中 Cortex-A53 是小核.
+         *  HMP 调度器中目前只有两个调度域,即大核调度域和小核调度域,
+         *  比内核默认的负载均衡里的 CPU 拓扑关系要简单多了
+         */
 		if (is_little_cpu(cn))
 			cpumask_set_cpu(cpu, slow);
 		else
@@ -369,11 +392,24 @@ void __init arch_get_fast_and_slow_cpus(struct cpumask *fast,
 
 struct cpumask hmp_slow_cpu_mask;
 
+/*  HMP负载均衡调度器实现了自己的CPU拓扑结构,
+ *  该函数用于初始化HMP的cpu拓扑结构
+ *
+ *  调用关系
+ *  init_sched_fair_class( )
+ *      ->hmp_cpu_mask_setup( )
+ *          ->arch_get_hmp_domains( )
+ *  */
 void __init arch_get_hmp_domains(struct list_head *hmp_domains_list)
 {
 	struct cpumask hmp_fast_cpu_mask;
 	struct hmp_domain *domain;
 
+    /*  首先 arch_get_fast_and_slow_cpus( ) 去获取系统中大小核 CPU 的 index.
+     *  这里分别为大小核定义了 domain,
+     *  把小核的 CPUs 放到小核的 domain 上,大核 CPUs 放到大核 domain 上,
+     *  然后加入到全局链表 hmp_domains_list.
+     *  */
 	arch_get_fast_and_slow_cpus(&hmp_fast_cpu_mask, &hmp_slow_cpu_mask);
 
 	/*

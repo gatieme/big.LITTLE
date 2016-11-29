@@ -3659,7 +3659,8 @@ static int __init hmp_cpu_mask_setup(void)
 
 	pr_debug("Initializing HMP scheduler:\n");
 
-	/* Initialize hmp_domains using platform code */
+	/* Initialize hmp_domains using platform code
+     * see arch/arm[64]/kernel/topology.c   */
 	arch_get_hmp_domains(&hmp_domains);
 	if (list_empty(&hmp_domains)) {
 		pr_debug("HMP domain list is empty!\n");
@@ -3720,7 +3721,20 @@ static inline unsigned int hmp_cpu_is_slowest(int cpu);
 static inline struct hmp_domain *hmp_slower_domain(int cpu);
 static inline struct hmp_domain *hmp_faster_domain(int cpu);
 
-/* must hold runqueue lock for queue se is currently on */
+/* must hold runqueue lock for queue se is currently on
+ * 查找并返回CPU(target_cpu)上最繁忙的进程,
+ *
+ * 参数描述
+ * se           该 CPU 的当前进程curr的调度实体
+ * target_cpu   该 CPU 的编号, 如果传入-1, 则表示目标运行的cpu为大核调度域中任何一个合适的大核
+ *                             如果传入>0, 则表示任务将要迁移到的目标大核cpu
+ *
+ * 返回值
+ *  如果调度实体 se 所处的 CPU 是大核, 则直接返回  se
+ *  如果target_cpu > 0, 但是却不在大核的调度域中, 即该目标 CPU 是小核, 则返回NULL
+ *  其他情况参数正确且合法(se为小核上的某个调度实体, target_cpu 为-1或者某个大核),
+ *  则返回se所在的CPU上负载最大的那个调度实体 max_se
+ * */
 static struct sched_entity *hmp_get_heaviest_task(
 				struct sched_entity *se, int target_cpu)
 {
@@ -3730,24 +3744,27 @@ static struct sched_entity *hmp_get_heaviest_task(
 	const struct cpumask *hmp_target_mask = NULL;
 	struct hmp_domain *hmp;
 
-	if (hmp_cpu_is_fastest(cpu_of(se->cfs_rq->rq)))
-		return max_se;
+	if (hmp_cpu_is_fastest(cpu_of(se->cfs_rq->rq))) /*  判断该 CPU 是否处于大核 CPU 的调度域中  */
+		return max_se;                              /*  如果是则直接返回当前进程的调度实体      */
 
 	hmp = hmp_faster_domain(cpu_of(se->cfs_rq->rq));
-	hmp_target_mask = &hmp->cpus;
-	if (target_cpu >= 0) {
+	hmp_target_mask = &hmp->cpus;                   /*  指向大核调度域中cpumask位图             */
+	if (target_cpu >= 0) {                          /*  如果参数target_cpu传入的是实际的CPU编号 */
 		/* idle_balance gets run on a CPU while
 		 * it is in the middle of being hotplugged
 		 * out. Bail early in that case.
 		 */
-		if(!cpumask_test_cpu(target_cpu, hmp_target_mask))
-			return NULL;
-		hmp_target_mask = cpumask_of(target_cpu);
+		if(!cpumask_test_cpu(target_cpu, hmp_target_mask))  /*  判断target_cpu是否在大核的调度域内  */
+			return NULL;                                    /*  如果指定的target_cpu不是大核,
+                                                                则当前操作为希望从一个小核上返回一个最繁忙的进程,
+                                                                却要把该进程放到另外一个小核target_cpu上, 返回NULL    */
+		hmp_target_mask = cpumask_of(target_cpu);           /*  设置mask信息为指定的target_cpu的mask信息    */
 	}
-	/* The currently running task is not on the runqueue */
+	/* The currently running task is not on the runqueue
+     * curr 进程是不在 CPU 的运行队列里面的 */
 	se = __pick_first_entity(cfs_rq_of(se));
 
-	while (num_tasks && se) {
+	while (num_tasks && se) {   /*  从当前CPU 的红黑树中找出负载最大的那个调度实体max_se    */
 		if (entity_is_task(se) &&
 			se->avg.load_avg_ratio > max_ratio &&
 			cpumask_intersects(hmp_target_mask,
@@ -3758,9 +3775,22 @@ static struct sched_entity *hmp_get_heaviest_task(
 		se = __pick_next_entity(se);
 		num_tasks--;
 	}
+
 	return max_se;
 }
 
+/*  hmp_get_lightest_task()函数和 hmp_get_heaviest_task()函数类似,
+ *  返回 se 调度实体对应的运行队列中任务最轻的调度实体 min_se
+ *
+ *  参数
+ *      se              调度实体指示了待处理的调度实体, 其所在的运行队列 和 CPU
+ *      migrate_down    控制变量, 传入1, 表示检查是否可以进行向下迁移(将任务从大核迁移到小核)
+ *
+ *  调用关系
+ *      run_rebalance_domains( )
+ *          ->  hmp_force_up_migration( )
+ *              ->  hmp_get_lightest_task( )
+ * */
 static struct sched_entity *hmp_get_lightest_task(
 				struct sched_entity *se, int migrate_down)
 {
@@ -3769,9 +3799,9 @@ static struct sched_entity *hmp_get_lightest_task(
 	unsigned long int min_ratio = se->avg.load_avg_ratio;
 	const struct cpumask *hmp_target_mask = NULL;
 
-	if (migrate_down) {
+	if (migrate_down) {         /*  进行向下迁移, 将任务从大核迁移到小核    */
 		struct hmp_domain *hmp;
-		if (hmp_cpu_is_slowest(cpu_of(se->cfs_rq->rq)))
+		if (hmp_cpu_is_slowest(cpu_of(se->cfs_rq->rq))) /*  检查当前se所在的cpu是不是大核, 如果不是, 则直接返回 min_se = se   */
 			return min_se;
 		hmp = hmp_slower_domain(cpu_of(se->cfs_rq->rq));
 		hmp_target_mask = &hmp->cpus;
@@ -3779,7 +3809,7 @@ static struct sched_entity *hmp_get_lightest_task(
 	/* The currently running task is not on the runqueue */
 	se = __pick_first_entity(cfs_rq_of(se));
 
-	while (num_tasks && se) {
+	while (num_tasks && se) {               /*  从 se 所在 CPU 的任务队列上找到那个负载最小的进程 */
 		if (entity_is_task(se) &&
 			(se->avg.load_avg_ratio < min_ratio &&
 			hmp_target_mask &&
@@ -4244,6 +4274,22 @@ late_initcall(hmp_attr_init);
  *   + if all CPUs are equally loaded or idle and the times are
  *     all the same, the first in the set will be used
  *   + if affinity is not set, cpu_online_mask is used
+ *
+ *   参数
+ *   hmpd       HMP调度域, 一般来说传入的是大核的调度域
+ *   min_cpu    是一个指针变量用来传递结果给调用者
+ *   affinify   是另外一个cpumask位图, 在我们上下文中是刚才讨论的进程可以运行的 CPU 位图,
+ *              一般来说进程通常都运行在所有的CPU上运行
+ *
+ *   返回值
+ *   0      返回0, 表示找到了空闲的CPU, 并用 min_cpu 返回找到的 cpu 的编号
+ *   1023   返回1023, 表示该调度域没有空闲CPU也即是都在繁忙中
+ *
+ *   调用关系
+ *   run_rebalance_domains( )
+ *      ->  hmp_force_up_migration( )
+ *          ->  hmp_up_migration( )
+ *              -> hmp_domain_min_load
  */
 static inline unsigned int hmp_domain_min_load(struct hmp_domain *hmpd,
 						int *min_cpu, struct cpumask *affinity)
@@ -4260,27 +4306,32 @@ static inline unsigned int hmp_domain_min_load(struct hmp_domain *hmpd,
 	 * only look at CPUs allowed if specified,
 	 * otherwise look at all online CPUs in the
 	 * right HMP domain
+     *
+     * 检查hmpd 调度域上 cpumask 和 affinity 位图
 	 */
 	cpumask_and(&temp_cpumask, &hmpd->cpus, affinity ? affinity : cpu_online_mask);
 
-	for_each_cpu_mask(cpu, temp_cpumask) {
-		avg = &cpu_rq(cpu)->avg;
+	for_each_cpu_mask(cpu, temp_cpumask) {  /*  遍历 temp_cpumask 位图上的所有 CPU      */
+		avg = &cpu_rq(cpu)->avg;            /*  获取当前检查的 cpu 上运行队列的平均负载 */
 		/* used for both up and down migration */
 		curr_last_migration = avg->hmp_last_up_migration ?
 			avg->hmp_last_up_migration : avg->hmp_last_down_migration;
 
-		contrib = avg->load_avg_ratio;
+		contrib = avg->load_avg_ratio;      /*  获取平均负载信息 avg->load_avg_ratio    */
 		/*
 		 * Consider a runqueue completely busy if there is any load
 		 * on it. Definitely not the best for overall fairness, but
 		 * does well in typical Android use cases.
 		 */
-		if (contrib)
-			contrib = 1023;
+		if (contrib)                        /*  如果当前 cpu 上有负载(load_avg_ratio)   */
+			contrib = 1023;                 /*  那么 contrib 统统设置为 1023,
+            为何这样做呢?   因为该函数的目的就是找一个空闲CPU, 如果当前CPU有负载, 说明不空闲,
+            因此统一设置为 1023, 仅仅是为了表示该CPU不是空闲而已
+            同时一趟遍历下来, 如果没有空闲CPU, 则最小负载值值都是 1023  */
 
 		if ((contrib < min_runnable_load) ||
-			(contrib == min_runnable_load &&
-			 curr_last_migration < min_target_last_migration)) {
+			(contrib == min_runnable_load &&                        /*  如果有多个 CPU 的 contrib 值相同            */
+			 curr_last_migration < min_target_last_migration)) {    /*  那么选择该调度域中最近一个发生过迁移的CPU   */
 			/*
 			 * if the load is the same target the CPU with
 			 * the longest time since a migration.
@@ -4316,37 +4367,50 @@ static inline unsigned int hmp_task_starvation(struct sched_entity *se)
 	return scale_load(starvation);
 }
 
+/*  为(大核上)负载最轻的进程调度实体 se 选择一个合适的迁移目标CPU(小核)
+ *
+ *
+ *  调用关系
+ *      run_rebalance_domains( )
+ *          ->  hmp_force_up_migration( )
+ *              ->  hmp_offload_down( )
+ *  */
 static inline unsigned int hmp_offload_down(int cpu, struct sched_entity *se)
 {
 	int min_usage;
 	int dest_cpu = NR_CPUS;
 
-	if (hmp_cpu_is_slowest(cpu))
+	if (hmp_cpu_is_slowest(cpu))    /*  如果当前CPU就是一个小核, 则无需迁移, */
 		return NR_CPUS;
 
-	/* Is there an idle CPU in the current domain */
+	/* Is there an idle CPU in the current domain
+     * 查找当前 cpu 调度域(大核)是否有空闲 CPU  */
 	min_usage = hmp_domain_min_load(hmp_cpu_domain(cpu), NULL, NULL);
-	if (min_usage == 0) {
+	if (min_usage == 0) {           /*  如果大核中有空闲的 CPU, 则也不做迁移    */
 		trace_sched_hmp_offload_abort(cpu, min_usage, "load");
 		return NR_CPUS;
 	}
 
 	/* Is the task alone on the cpu? */
-	if (cpu_rq(cpu)->cfs.h_nr_running < 2) {
+	if (cpu_rq(cpu)->cfs.h_nr_running < 2) {    /*  如果该 CPU 的运行队列中正在运行的进程只有一个或者没有, 那么也不需要迁移 */
 		trace_sched_hmp_offload_abort(cpu,
 			cpu_rq(cpu)->cfs.h_nr_running, "nr_running");
 		return NR_CPUS;
 	}
 
-	/* Is the task actually starving? */
+	/* Is the task actually starving? 判断当前进程是否饥饿  */
 	/* >=25% ratio running/runnable = starving */
-	if (hmp_task_starvation(se) > 768) {
+	if (hmp_task_starvation(se) > 768) {    /*  当starving > 75% 时说明该进程一直渴望获得更多的 CPU 时间, 这样的进程也不适合迁移    */
 		trace_sched_hmp_offload_abort(cpu, hmp_task_starvation(se),
 			"starvation");
 		return NR_CPUS;
 	}
 
-	/* Does the slower domain have any idle CPUs? */
+	/* Does the slower domain have any idle CPUs?
+     * 检查小核的调度域中是否有空闲的CPU
+     * 如果有的话返回该空闲 CPU,
+     * 如果没有的话返回 NR_CPUS, 说明没找到合适的CPU用做迁移的目的地
+     * */
 	min_usage = hmp_domain_min_load(hmp_slower_domain(cpu), &dest_cpu,
 			tsk_cpus_allowed(task_of(se)));
 
@@ -4882,7 +4946,7 @@ static bool yield_to_task_fair(struct rq *rq, struct task_struct *p, bool preemp
  *
  * The adjacency matrix of the resulting graph is given by:
  *
- *             log_2 n     
+ *             log_2 n
  *   A_i,j = \Union     (i % 2^k == 0) && i / 2^(k+1) == j / 2^(k+1)  (6)
  *             k = 0
  *
@@ -4928,7 +4992,7 @@ static bool yield_to_task_fair(struct rq *rq, struct task_struct *p, bool preemp
  *
  * [XXX write more on how we solve this.. _after_ merging pjt's patches that
  *      rewrite all of this once again.]
- */ 
+ */
 
 static unsigned long __read_mostly max_load_balance_interval = HZ/10;
 
@@ -5498,7 +5562,7 @@ void update_group_power(struct sched_domain *sd, int cpu)
 		/*
 		 * !SD_OVERLAP domains can assume that child groups
 		 * span the current group.
-		 */ 
+		 */
 
 		group = child->groups;
 		do {
@@ -6915,6 +6979,19 @@ static void nohz_idle_balance(int this_cpu, enum cpu_idle_type idle) { }
 #endif
 
 #ifdef CONFIG_SCHED_HMP
+/*  判断进程实体 se 的平均负载是否高于 hmp_up_threshold 这个阀值
+ *  hmp_up_threshold 也是一个过滤作用
+ *  目前 HMP负载均衡调度器有几个负载
+ *
+ *  #ifdef CONFIG_SCHED_HMP_PRIO_FILTER
+ *  一个是优先级            hmp_up_prio, 优先级值高于hmp_up_prio(即优先级较低)的进程无需从小核迁移到大核
+ *  #endif                  该阀值由 CONFIG_SCHED_HMP_PRIO_FILTER 宏开启
+ *
+ *  一个是负载              hmp_up_threshold,   只有负载高于 hmp_up_threshold 的进程才需要迁移
+ *
+ *  一个是迁移的间隔        hmp_next_up_threshold,  只有上次迁移距离当前时间的间隔大于hmp_next_up_threshold 的进程才可以进行迁移
+ *                          该阀值避免进程被迁移来迁移去
+ *  */
 static unsigned int hmp_task_eligible_for_up_migration(struct sched_entity *se)
 {
 	/* below hmp_up_threshold, never eligible */
@@ -6923,26 +7000,59 @@ static unsigned int hmp_task_eligible_for_up_migration(struct sched_entity *se)
 	return 1;
 }
 
-/* Check if task should migrate to a faster cpu */
+/* Check if task should migrate to a faster cpu
+ * 检查 cpu 上的调度实体 se 是否需要迁移到大核上
+ *
+ * 调用关系
+ * run_rebalance_domains( )
+ *  ->  hmp_force_up_migration( )
+ *      ->  hmp_up_migration( )
+ *
+ * 返回值
+ *
+ *  如果 se 本来就是在大核上运行, 则无需进行向上迁移, return 0
+ *
+ *  如果开启了CONFIG_SCHED_HMP_PRIO_FILTER宏,
+ *  而se->prio > hmp_up_prio, 即 se 的优先级过于低, 不适宜向上迁移,
+ *  这点是符合现实情况的, 低优先级的进程无关紧要, 用户也不会在意其更快的完成和响应,
+ *  自然没必要需要迁移到大核上去获得更高的性能, return 0
+ *
+ *  该进程上一次迁移离现在的时间间隔小于 hmp_next_up_threshold 阀值的也不需要迁移, 避免被迁移来迁移去, return 0
+ *
+ *  其他情况, 如果进程满足向上迁移的需求, 则从大核的调度域中找到一个空闲的CPU
+ * */
 static unsigned int hmp_up_migration(int cpu, int *target_cpu, struct sched_entity *se)
 {
 	struct task_struct *p = task_of(se);
 	int temp_target_cpu;
 	u64 now;
 
-	if (hmp_cpu_is_fastest(cpu))
-		return 0;
+	if (hmp_cpu_is_fastest(cpu))        /*  首先判断 se 原来所运行的 cpu 是否在大核的调度域  */
+		return 0;                       /*  如果已经在大核的调度域内, 则没必要进行迁移繁忙的进程　se 到大核 target_cpu 上   */
 
 #ifdef CONFIG_SCHED_HMP_PRIO_FILTER
-	/* Filter by task priority */
+	/* Filter by task priority
+     * hmp_up_prio 用于过滤优先级高于该值的进程,
+     * 如果待迁移进程 p 优先级大于 hmp_up_prio ,
+     * 那么也没必要迁移到大核 CPU 上
+     *
+     * 这个要打开 CONFIG_SCHED_HMP_PRIO_FILTER  这个宏才能开始此功能,
+     * 另外注意优先级的数值是越低优先级越高,
+     * 因此此功能类似于如果任务优先级比较低,
+     * 可以设置一个阀值 hmp_up_prio,
+     * 优先级低于阀值的进程即使再繁重我们也不需要对他进行迁移,
+     * 从而保证高优先级进行优先得到响应和迁移   */
 	if (p->prio >= hmp_up_prio)
 		return 0;
 #endif
-	if (!hmp_task_eligible_for_up_migration(se))
+	if (!hmp_task_eligible_for_up_migration(se))    /*  判断该进程实体se的平均负载是否高于 hmp_up_threshold 这个阀值   */
 		return 0;
 
 	/* Let the task load settle before doing another up migration */
 	/* hack - always use clock from first online CPU */
+    /*  迁移时间上的过滤,
+     *  该进程上一次迁移离现在的时间间隔小于 hmp_next_up_threshold 阀值的也不需要迁移,
+     *  从而避免进程被迁移来迁移去  */
 	now = cpu_rq(cpumask_first(cpu_online_mask))->clock_task;
 	if (((now - se->avg.hmp_last_up_migration) >> 10)
 					< hmp_next_up_threshold)
@@ -6951,12 +7061,14 @@ static unsigned int hmp_up_migration(int cpu, int *target_cpu, struct sched_enti
 	/* hmp_domain_min_load only returns 0 for an
 	 * idle CPU or 1023 for any partly-busy one.
 	 * Be explicit about requirement for an idle CPU.
+     *
+     * 查找大核调度域中是否有空闲的CPU
 	 */
 	if (hmp_domain_min_load(hmp_faster_domain(cpu), &temp_target_cpu,
-			tsk_cpus_allowed(p)) == 0 && temp_target_cpu != NR_CPUS) {
+			tsk_cpus_allowed(p)) == 0 && temp_target_cpu != NR_CPUS) {  /*  如果在大核调度域中找到了一个空闲的CPU, 即target_cpu */
 		if(target_cpu)
-			*target_cpu = temp_target_cpu;
-		return 1;
+			*target_cpu = temp_target_cpu;  /*  设置 target_cpu 为查找到的 CPU                              */
+		return 1;                           /*  返回1, 在大核调度域中发现了空闲的 CPU, 用 target_cpu 返回   */
 	}
 	return 0;
 }
@@ -7161,6 +7273,10 @@ static DEFINE_SPINLOCK(hmp_force_migration);
 /*
  * hmp_force_up_migration checks runqueues for tasks that need to
  * be actively migrated to a faster cpu.
+ *
+ * 调用关系
+ * run_rebalance_domains( )
+ *  ->  hmp_force_up_migration( )
  */
 static void hmp_force_up_migration(int this_cpu)
 {
@@ -7171,19 +7287,21 @@ static void hmp_force_up_migration(int this_cpu)
 	unsigned int force, got_target;
 	struct task_struct *p;
 
+    /*  hmp_force_migration 是一个 HMP 定义的锁  */
 	if (!spin_trylock(&hmp_force_migration))
 		return;
+    /*  从头开始遍历 所有在线(活跃)的 CPU, 由cpu_online_mask 标识   */
 	for_each_online_cpu(cpu) {
 		force = 0;
 		got_target = 0;
-		target = cpu_rq(cpu);
-		raw_spin_lock_irqsave(&target->lock, flags);
-		curr = target->cfs.curr;
-		if (!curr || target->active_balance) {
+		target = cpu_rq(cpu);   /*  获取到 CPU 的运行队列   */
+		raw_spin_lock_irqsave(&target->lock, flags);    /*  对运行队列加锁  */
+		curr = target->cfs.curr;    /*  获取到 CPU 上当前的调度实体 */
+		if (!curr || target->active_balance) {  /*  如果当前CPU上正在做负载均衡, 则跳过该CPU    */
 			raw_spin_unlock_irqrestore(&target->lock, flags);
 			continue;
 		}
-		if (!entity_is_task(curr)) {
+		if (!entity_is_task(curr)) {    /*  如果当前运行的调度实体不是进程, 而是一个进程组, 则从中取出正在运行的进, 而是一个进程组, 则从中取出正在运行的进程程  */
 			struct cfs_rq *cfs_rq;
 
 			cfs_rq = group_cfs_rq(curr);
@@ -7193,34 +7311,49 @@ static void hmp_force_up_migration(int this_cpu)
 			}
 		}
 		orig = curr;
-		curr = hmp_get_heaviest_task(curr, -1);
-		if (!curr) {
+		curr = hmp_get_heaviest_task(curr, -1); /*  从当前 CPU(小核) 中找到负载 se->avg.load_avg_ratio 最大(即最繁忙)的那个进程*/
+		if (!curr) {                            /*  没有需要迁移的进程*/
 			raw_spin_unlock_irqrestore(&target->lock, flags);
 			continue;
 		}
-		p = task_of(curr);
-		if (hmp_up_migration(cpu, &target_cpu, curr)) {
-			cpu_rq(target_cpu)->wake_for_idle_pull = 1;
+		p = task_of(curr);                      /*  获取到找到的大负载进行的 task_struct 结构 */
+		if (hmp_up_migration(cpu, &target_cpu, curr)) {         /*  判断刚才取得的最大负载的调度实体 curr 是否需要迁移到大核 CPU 上, 如果需要则找到大核中一个空闲的 CPU(target_cpu)  */
+			cpu_rq(target_cpu)->wake_for_idle_pull = 1;         /*  设置将要迁移的目标 CPU(target_cpu) 运行队列上的 wake_for_idle_pull 标志位  */
 			raw_spin_unlock_irqrestore(&target->lock, flags);
 			spin_unlock(&hmp_force_migration);
-			smp_send_reschedule(target_cpu);
+			smp_send_reschedule(target_cpu);                    /*  发送一个IPI_RESCHEDULE 的 IPI 中断给 target_cpu */
 			return;
 		}
-		if (!got_target) {
+		/*  刚才那个 CPU 真是小幸运,
+         *      正好它是小核上的 CPU
+         *      并且有合适迁移到大核上的进程(负载大于阀值, 且近期未发生迁移, 进程优先级也满足阀值要求)
+         *      最重要的是大核调度域上有空闲的 CPU,
+         *  这叫作无巧不成书.
+         *
+         *  我们下面看看没那么好运气的其他 CPU 的情况, 一般来说有如下几种情况
+         *      hmp_up_migration( )返回了 0
+         *          一种是调度实体curr需要向上迁移, 但是大核的调度域内没有空闲的的大核CPU
+         *          另外一种是调度实体不需要迁移(不满足阀值要求, 或者curr本身就在大核上)
+         *
+         *  我们首先考虑curr本身就在大核上运行的情况其他的情况,
+         *  curr运行在大核上时hmp_get_heaviest_task直接返回了curr(此时orig == curr)
+         *  而hmp_up_migration( )在判断进程在大核上运行时也直接返回了0,
+         */
+        if (!got_target) {                                      /*  如果此时没有*/
 			/*
 			 * For now we just check the currently running task.
 			 * Selecting the lightest task for offloading will
 			 * require extensive book keeping.
 			 */
-			curr = hmp_get_lightest_task(orig, 1);
+			curr = hmp_get_lightest_task(orig, 1);          /*  返回 orig 调度实体对应的运行队列中任务最轻的调度实体min_se  */
 			p = task_of(curr);
-			target->push_cpu = hmp_offload_down(cpu, curr);
-			if (target->push_cpu < NR_CPUS) {
+			target->push_cpu = hmp_offload_down(cpu, curr); /*  查询刚才找到的最轻负载的进程能迁移到哪个 CPU上去, 返回迁移目标target->push_cpu  */
+			if (target->push_cpu < NR_CPUS) {               /*  如果返回值是NR_CPUS, 则表示没有找到合适的迁移目标CPU    */
 				get_task_struct(p);
 				target->migrate_task = p;
 				got_target = 1;
 				trace_sched_hmp_migrate(p, target->push_cpu, HMP_MIGRATE_OFFLOAD);
-				hmp_next_down_delay(&p->se, target->push_cpu);
+				hmp_next_down_delay(&p->se, target->push_cpu);      /*  更新调度实体的hmp_last_down_migration和hmp_last_up_migration 记录为现在时刻的时间   */
 			}
 		}
 		/*
@@ -7229,7 +7362,7 @@ static void hmp_force_up_migration(int this_cpu)
 		 * CPU stopper take care of it.
 		 */
 		if (got_target) {
-			if (!task_running(target, p)) {
+			if (!task_running(target, p)) {     /*  如果要迁移的进程p没有正在运行, 即p->on_cpu == 0 */
 				trace_sched_hmp_migrate_force_running(p, 0);
 				hmp_migrate_runnable_task(target);
 			} else {
@@ -7294,7 +7427,7 @@ static unsigned int hmp_idle_pull(int this_cpu)
 			}
 		}
 		orig = curr;
-		curr = hmp_get_heaviest_task(curr, this_cpu);
+		curr = hmp_get_heaviest_task(curr, this_cpu);   /*  从当前CPU中找到负载最大(即最繁忙)的那个进程*/
 		/* check if heaviest eligible task on this
 		 * CPU is heavier than previous task
 		 */
@@ -7362,7 +7495,15 @@ static void run_rebalance_domains(struct softirq_action *h)
 						CPU_IDLE : CPU_NOT_IDLE;
 
 #ifdef CONFIG_SCHED_HMP
-	/* shortcut for hmp idle pull wakeups */
+	/* shortcut for hmp idle pull wakeups
+     *
+     * 首先检查当前CPU运行队列的wake_for_idle_pull 标识
+     * 该标志位是说
+     *  有一个小核调度域上的比较繁忙的进程需要被迁移到大核上
+     *  而大核的调度域上刚好有一个空闲的 CPU
+     *
+     *  那么这样正好可以适合把该进程迁移到大核的空闲CPU上
+     * */
 	if (unlikely(this_rq->wake_for_idle_pull)) {
 		this_rq->wake_for_idle_pull = 0;
 		if (hmp_idle_pull(this_cpu)) {
@@ -7878,7 +8019,9 @@ void print_cfs_stats(struct seq_file *m, int cpu)
 __init void init_sched_fair_class(void)
 {
 #ifdef CONFIG_SMP
-	open_softirq(SCHED_SOFTIRQ, run_rebalance_domains);
+    /*  和内核中默认的负载均衡调度器一样需要注册一个软中断softirq,
+     *  回调函数是run_rebalance_domains( ) */
+    open_softirq(SCHED_SOFTIRQ, run_rebalance_domains);
 
 #ifdef CONFIG_NO_HZ_COMMON
 	nohz.next_balance = jiffies;
@@ -7887,7 +8030,15 @@ __init void init_sched_fair_class(void)
 #endif
 
 #ifdef CONFIG_SCHED_HMP
-	hmp_cpu_mask_setup();
+    /*  另外一个就是建立 HMP 的 CPU 拓扑关系(CPU TOPOLOBY)
+     *  [CPU 的拓扑结构可以参见, include/linux/topology.h 或者具体体系结构的实现]
+     *  HMP 调度器重新定义了 domain 的实现,
+     *  定义了 struct hmp_domain 数据结构(include/linux/sched.h)
+     *  该结构比较简单, cpus 和 possible_cpus 两个 cpumask 变量以及一个链表节点.
+     *  hmp_cpu_domain 是定义为 pre-CPU 变量,
+     *  即每个 CPU 有一个 struct hmp_domain 数据结构,
+     *  另外还定义了一个全局的链表 hmp_domains */
+    hmp_cpu_mask_setup();
 #endif
 #endif /* SMP */
 

@@ -892,6 +892,14 @@ void free_sched_domains(cpumask_var_t doms[], unsigned int ndoms);
 bool cpus_share_cache(int this_cpu, int that_cpu);
 
 #ifdef CONFIG_SCHED_HMP
+/*  HMP 调度器重新定义了 domain 的实现,
+ *  定义了 struct hmp_domain 数据结构(include/linux/sched.h)
+ *  该结构比较简单, cpus 和 possible_cpus 两个 cpumask 变量以及一个链表节点.
+ *  hmp_cpu_domain 是定义为 pre-CPU 变量,
+ *  即每个 CPU 有一个 struct hmp_domain 数据结构,
+ *
+ *  另外还定义了一个全局的链表 hmp_domains
+ *  */
 struct hmp_domain {
 	struct cpumask cpus;
 	struct cpumask possible_cpus;
@@ -934,6 +942,12 @@ struct load_weight {
 	unsigned long weight, inv_weight;
 };
 
+/*  HMP 调度器同样使用内核中 Per-entity 的负载计算方法,
+ *  另外它还在 sched_avg 中定义了额外的两个负载变量 load_avg_ratio 和 usage_avg_sum
+ *  load_avg_ratio 和内核中 load_avg_contrib 计算方法
+ *  sa.load_avg_ratio = (sa.sunable_sum * NICE_0_LOAD) / sa.runable_period
+ *  类似,但是它没有乘以调度实体的实际权重,而是用 nice 为 0 的权重,
+ *  因此它是进程可运行时间的一个比率  */
 struct sched_avg {
 	/*
 	 * These sums represent an infinite geometric series and so are bound
@@ -944,12 +958,12 @@ struct sched_avg {
 	u64 last_runnable_update;
 	s64 decay_count;
 	unsigned long load_avg_contrib;
-	unsigned long load_avg_ratio;
+	unsigned long load_avg_ratio;       //  进程可运行时间的一个比率
 #ifdef CONFIG_SCHED_HMP
 	u64 hmp_last_up_migration;
 	u64 hmp_last_down_migration;
 #endif
-	u32 usage_avg_sum;
+	u32 usage_avg_sum;                  //  进程处于运行状态的负载
 };
 
 #ifdef CONFIG_SCHED_HMP
