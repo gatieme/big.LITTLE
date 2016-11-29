@@ -7558,7 +7558,7 @@ static void run_rebalance_domains(struct softirq_action *h)
      *  那么这样正好可以适合把该进程迁移到大核的空闲CPU上
      * */
 	if (unlikely(this_rq->wake_for_idle_pull)) {
-		this_rq->wake_for_idle_pull = 0;
+		this_rq->wake_for_idle_pull = 0;    /*  */
 		if (hmp_idle_pull(this_cpu)) {
 			/* break out unless running nohz idle as well */
 			if (idle != CPU_IDLE)
