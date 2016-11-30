@@ -7571,7 +7571,7 @@ static void run_rebalance_domains(struct softirq_action *h)
      * */
 	if (unlikely(this_rq->wake_for_idle_pull)) {
 		this_rq->wake_for_idle_pull = 0;    /*  清楚大核上的 wake_for_idle_pull 标示 */
-		if (hmp_idle_pull(this_cpu)) {      /*  */
+		if (hmp_idle_pull(this_cpu)) {      /*  idle 的大核 CPU(this_cpu) 开始 pull 进程从别的 CPU 上   */
 			/* break out unless running nohz idle as well */
 			if (idle != CPU_IDLE)
 				return;
