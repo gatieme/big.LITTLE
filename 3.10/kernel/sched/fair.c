@@ -4433,6 +4433,13 @@ static inline unsigned int hmp_offload_down(int cpu, struct sched_entity *se)
  * Returns the target CPU number, or the same CPU if no balancing is needed.
  *
  * preempt must be disabled.
+ *
+ * 在 HMP 调度器中对待新创建的进程会有特殊的处理
+ *
+ * 新创建的进程创建完成之后需要把进程添加到合适的运行队列中,
+ *
+ * 这个过程中会调用 select_task_rq( ) 函数来选择一个最合适新进程运行的 CPU
+ *
  */
 static int
 select_task_rq_fair(struct task_struct *p, int sd_flag, int wake_flags)
@@ -4449,7 +4456,7 @@ select_task_rq_fair(struct task_struct *p, int sd_flag, int wake_flags)
 
 #ifdef CONFIG_SCHED_HMP
 	/* always put non-kernel forking tasks on a big domain */
-	if (unlikely(sd_flag & SD_BALANCE_FORK) && hmp_task_should_forkboost(p)) {
+	if (unlikely(sd_flag & SD_BALANCE_FORK) && hmp_task_should_forkboost(p)) {  /*  对于新创建的进程并且该进程是用户进程    */
 		new_cpu = hmp_select_faster_cpu(p, prev_cpu);
 		if (new_cpu != NR_CPUS) {
 			hmp_next_up_delay(&p->se, new_cpu);
