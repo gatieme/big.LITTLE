@@ -7485,7 +7485,7 @@ static unsigned int hmp_idle_pull(int this_cpu)
 		/* check if heaviest eligible task on this
 		 * CPU is heavier than previous task
 		 */
-		if (curr && hmp_task_eligible_for_up_migration(curr) &&
+		if (curr && hmp_task_eligible_for_up_migration(curr) && /*  先判断这个负载重的进程是否合适迁移到大核 CPU 上(比较其负载是否大于阀值)   */
 			curr->avg.load_avg_ratio > ratio &&
 			cpumask_test_cpu(this_cpu,
 					tsk_cpus_allowed(task_of(curr)))) {
@@ -7499,33 +7499,37 @@ static unsigned int hmp_idle_pull(int this_cpu)
 	if (!p)
 		goto done;
 
-	/* now we have a candidate */
+	/* now we have a candidate
+     * 迁移进程 migrate_task    :   是刚才找到的 p = task_of(curr) 进程
+     * 迁移源 CPU               :   迁移进程对应的 CPU
+     * 迁移目的地 CPU           :   当前 CPU, 当前 CPU 是大核调度域中的一个
+     * */
 	raw_spin_lock_irqsave(&target->lock, flags);
 	if (!target->active_balance && task_rq(p) == target) {
 		get_task_struct(p);
-		target->push_cpu = this_cpu;
-		target->migrate_task = p;
+		target->push_cpu = this_cpu;        /*  迁移的目的 CPU  */
+		target->migrate_task = p;           /*  待迁移的进程    */
 		trace_sched_hmp_migrate(p, target->push_cpu, HMP_MIGRATE_IDLE_PULL);
-		hmp_next_up_delay(&p->se, target->push_cpu);
+		hmp_next_up_delay(&p->se, target->push_cpu);    /*  更新当前迁移的时间为 now    */
 		/*
 		 * if the task isn't running move it right away.
 		 * Otherwise setup the active_balance mechanic and let
 		 * the CPU stopper do its job.
 		 */
-		if (!task_running(target, p)) {
+		if (!task_running(target, p)) {                     /*  如果待迁移的进程不在运行    */
 			trace_sched_hmp_migrate_idle_running(p, 0);
-			hmp_migrate_runnable_task(target);
+			hmp_migrate_runnable_task(target);              /*  直接对进程进行迁移          */
 		} else {
 			target->active_balance = 1;
-			force = 1;
+			force = 1;                                      /*  否则设置强制迁移标识 force 为 1 */
 		}
 	}
 	raw_spin_unlock_irqrestore(&target->lock, flags);
 
 	if (force) {
 		/* start timer to keep us awake */
-		hmp_cpu_keepalive_trigger();
-		stop_one_cpu_nowait(cpu_of(target),
+		hmp_cpu_keepalive_trigger();                    /*  为大核设置保活监控定时器  */
+		stop_one_cpu_nowait(cpu_of(target),             /*  如果迁移进程正在运行, 那么和之前一样, 调用 stop_one_cpu_nowait( ) 函数强行迁移  */
 			hmp_active_task_migration_cpu_stop,
 			target, &target->active_balance_work);
 	}
