@@ -135,6 +135,53 @@ http://www.linaro.org/?s=big.LITTLE
 [Linux CPU core的电源管理(2)_cpu topology](http://www.wowotech.net/pm_subsystem/cpu_topology.html)
 
 
+##2.3   其他内核参照
+-------
+
+
+###2.3.1    魅族
+-------
+
+|   描述   |  地址    |
+|:--------:|:--------:|
+| 魅族内核 | [github](https://github.com), [博客](http://kernel.meizu.com)  |
+
+***m681(魅族m3note)**
+
+内核最后更新日期    2016-09-23
+
+https://github.com/meizuosc/m681/blob/master/arch/arm64/configs/m3note_defconfig
+
+CPU :   Helio P10(MT6755M), 配备Mali-T860 图形处理器
+
+采用8核心(big.LITTLE)   ARM Cortex-A53 1.8GHz x4 + ARM Cortex-A53 1.0GHz x4
+
+
+**m865(魅族mx6)**
+
+内核最后更新日期    2016-08-15
+
+https://github.com/meizuosc/m685/blob/master/arch/arm64/configs/mx6_defconfig
+
+CPU :   联发科Helio X20 10核心处理器, 图形处理器为700MHz的ARM Mali-T880 MP4。
+
+Helio X20选用三集群big.LITTLE架构,芯片内部集成
+
+*   2颗2.3-2.5GHz Cortex-A72核心、
+
+*   4颗2GHz Cortex-A53核心，
+
+*   以及另外4颗1.4GHz Cortex-A53核心
+
+
+与传统的双集群big.LITTLE架构相比，更复杂的三集群设计细化了各个核心的处理任务，
+
+*   Cortex-A72负责超高负荷运算，
+
+*   高频Cortex-A53核心处理重度任务，
+
+*   低频Cortex-A53核心辅助降低整体功耗。
+
 
 | 变频 | big.LITTLE |
 |:------:|:----------------:|
