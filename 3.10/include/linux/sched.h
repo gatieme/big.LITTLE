@@ -901,9 +901,9 @@ bool cpus_share_cache(int this_cpu, int that_cpu);
  *  另外还定义了一个全局的链表 hmp_domains
  *  */
 struct hmp_domain {
-	struct cpumask cpus;
-	struct cpumask possible_cpus;
-	struct list_head hmp_domains;
+	struct cpumask cpus;            /*  当前可运行 CPU 的 mask 标志         */
+	struct cpumask possible_cpus;   /*  所有可以运行的 CPU 的 mask 标志     */
+	struct list_head hmp_domains;   /*  链表指针域                          */
 };
 #endif /* CONFIG_SCHED_HMP */
 #else /* CONFIG_SMP */
@@ -958,18 +958,27 @@ struct sched_avg {
 	u64 last_runnable_update;
 	s64 decay_count;
 	unsigned long load_avg_contrib;
-	unsigned long load_avg_ratio;       //  进程可运行时间的一个比率
+	unsigned long load_avg_ratio;       /*  进程可运行时间的一个比率                */
 #ifdef CONFIG_SCHED_HMP
-	u64 hmp_last_up_migration;
-	u64 hmp_last_down_migration;
+	u64 hmp_last_up_migration;          /*  记录当前进程调度实体上次向上迁移的时间  */
+	u64 hmp_last_down_migration;        /*  记录当前进程调度实体上次向下迁移的时间  */
 #endif
-	u32 usage_avg_sum;                  //  进程处于运行状态的负载
+	u32 usage_avg_sum;                  /*  进程处于运行状态的负载                  */
 };
 
 #ifdef CONFIG_SCHED_HMP
 /*
  * We want to avoid boosting any processes forked from init (PID 1)
  * and kthreadd (assumed to be PID 2).
+ *
+ * 当 HMP 负载调度器处理新创建的进程时
+ * 为了避免处理 init(PID 1) 和 kthreadd(PID 2) 直接派生的进程
+ * 因此跳过此类进程的处理
+ *
+ * 调用关系
+ * int cpu = p->sched_class->select_task_rq(p, sd_flags, wake_flags);
+ *  ->  select_task_rq_fair( )
+ *      ->  hmp_task_should_forkboost( )
  */
 #define hmp_task_should_forkboost(task) ((task->parent && task->parent->pid > 2))
 #endif
