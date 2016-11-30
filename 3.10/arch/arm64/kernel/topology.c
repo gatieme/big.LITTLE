@@ -483,11 +483,22 @@ void __init arch_get_fast_and_slow_cpus(struct cpumask *fast,
 
 struct cpumask hmp_slow_cpu_mask;
 
+
+/*
+ *  HMP负载均衡调度器实现了自己的CPU拓扑结构,
+ *  该函数用于初始化HMP的cpu拓扑结构
+ *
+ *  调用关系
+ *  init_sched_fair_class( )
+ *      ->hmp_cpu_mask_setup( )
+ *          ->arch_get_hmp_domains( )
+ *  */
 void __init arch_get_hmp_domains(struct list_head *hmp_domains_list)
 {
 	struct cpumask hmp_fast_cpu_mask;
 	struct hmp_domain *domain;
 
+    /*  获取大小核的 CPU MASK (hmp_hast_cpu_mask, hmp_slow_cpu_mask)    */
 	arch_get_fast_and_slow_cpus(&hmp_fast_cpu_mask, &hmp_slow_cpu_mask);
 
 	/*

@@ -37,6 +37,35 @@ and another schuler for ISA
 -------
 
 
+**内核中cpufreq调频机制的实现**
+
+*   传统的Cpufreq-Governor, 均是基于采样的,
+
+*   基于调度器的 CPU 调频策略
+
+    linaro 实现了(cpufreq_sched), 直接由内核调度器来设置 CPU 频率,
+    (由于会增加调度器的负担而被内核 mainline 弃用)
+
+    内核社区最近出现的新机制 - utilization update callback, 基于回调机制,
+    linux-4.7的之后合并入内核mainline
+
+[基于调度器的 CPU 调频机制](http://kernel.meizu.com/cpufreq-sched.html)
+
+[Cpufreq Governor 内核源码](http://lxr.free-electrons.com/source/drivers/cpufreq/)
+
+[New ‘interactive’ governor](https://lwn.net/Articles/662209/)
+
+[Cpufreq_sched 补丁](https://lkml.org/lkml/2016/2/22/1037)
+
+[utilization update callback](https://lkml.org/lkml/2016/2/15/734)
+
+[Schedutil 补丁](https://lkml.org/lkml/2016/3/29/1041)
+
+
+**其他参照**
+
+
+
 [如何评价 ARM 的 big.LITTLE 大小核切换技术？](https://www.zhihu.com/question/23299449)
 
 [tegra3 CPU auto hotplug和Big/little switch工作的基本原理](http://blog.csdn.net/21cnbao/article/details/7221994)

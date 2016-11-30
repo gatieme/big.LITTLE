@@ -3649,7 +3649,12 @@ static void hmp_cpu_keepalive_cancel(int cpu)
 }
 #endif
 
-/* Setup hmp_domains */
+/* Setup hmp_domains
+ *
+ * 调用关系
+ * init_sched_fair_class( )
+ *  ->  hmp_cpu_mask_setup( )
+ * */
 static int __init hmp_cpu_mask_setup(void)
 {
 	char buf[64];
