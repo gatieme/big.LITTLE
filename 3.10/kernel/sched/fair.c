@@ -1235,8 +1235,23 @@ struct hmp_global_attr {
 };
 
 #define HMP_DATA_SYSFS_MAX 8
-
-struct hmp_data_struct {
+/*
+ *  hmp_domains
+ *  up_threshold
+ *  down_threshold
+ *  #ifdef CONFIG_HMP_VARIABLE_SCALE
+ *  load_avg_period_ms              default(LOAD_AVG_PERIOD)
+ *  #endif
+ *  #ifdef CONFIG_HMP_FREQUENCY_INVARIANT_SCALE
+ *  frequency-invariant scaling     default(ON)
+ *  #endif
+ *  #ifdef CONFIG_SCHED_HMP_LITTLE_PACKING
+ *  packing_enable                  default(ON)
+ *  packing_limit                   default(hmp_full_threshold)
+ *  #endif
+ *  hmp
+ * */
+struct hmp_data_struct {            /*  sysfs 文件系统的操作接口    */
 #ifdef CONFIG_HMP_FREQUENCY_INVARIANT_SCALE
 	int freqinvar_load_scale_enabled;
 #endif
@@ -3854,7 +3869,13 @@ unsigned int hmp_next_up_threshold = 4096;
 unsigned int hmp_next_down_threshold = 4096;
 
 #ifdef CONFIG_SCHED_HMP_LITTLE_PACKING
-/*
+/* 小任务封包补丁, 将负载小于NICE_0 80% 的进程, 看做是小任务
+ * 将这些小任务打包成一个任务来看待, 他们共享负载和 CPU 频率
+ * 可以查看文档 Documentation/arm/small_task_packing.txt
+ * 如果系统中小任务比较多, 那么会将这些小任务进行封包调整, 迁移到一个小核 CPU 上
+ * 直到该核上所有运行的小任务的总负载达到了 /sys/kernel/hmp/packing_limit
+ * 这些小任务就被封装成了一个任务包
+ *
  * Set the default packing threshold to try to keep little
  * CPUs at no more than 80% of their maximum frequency if only
  * packing a small number of small tasks. Bigger tasks will
@@ -7093,8 +7114,8 @@ static unsigned int hmp_down_migration(int cpu, struct sched_entity *se)
 	struct task_struct *p = task_of(se);
 	u64 now;
 
-	if (hmp_cpu_is_slowest(cpu)) {  /*  如果当前调度实体所在的 CPU 已经是小核   */
-#ifdef CONFIG_SCHED_HMP_LITTLE_PACKING
+	if (hmp_cpu_is_slowest(cpu)) {          /*  如果当前调度实体所在的 CPU 已经是小核       */
+#ifdef CONFIG_SCHED_HMP_LITTLE_PACKING      /*  小任务封包补丁, 运行小任务在小核之间迁移    */
 		if(hmp_packing_enabled)
 			return 1;
 		else
