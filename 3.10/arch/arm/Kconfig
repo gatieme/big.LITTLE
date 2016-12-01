@@ -1576,6 +1576,7 @@ config HMP_VARIABLE_SCALE
 config HMP_FREQUENCY_INVARIANT_SCALE
 	bool "(EXPERIMENTAL) Frequency-Invariant Tracked Load for HMP"
 	depends on SCHED_HMP && CPU_FREQ
+    depends on !ARCH_SCALE_INVARIANT_CPU_CAPACITY
 	help
 	  Scales the current load contribution in line with the frequency
 	  of the CPU that the task was executed on.
@@ -1674,9 +1675,6 @@ config HEVTASK_INTERFACE
 	bool "task status interface"
 	help
 	  The option provide an interface to show task status
-# add by gatieme(ChengJean) for SCHED_HMP_ENHANCEMENT
-# end 2016-12-01 16:19
-
 
 config ARCH_SCALE_INVARIANT_CPU_CAPACITY
        bool "(EXPERIMENTAL) Scale-Invariant CPU Compute Capacity Recording"
@@ -1692,6 +1690,9 @@ config ARCH_SCALE_INVARIANT_CPU_CAPACITY
          reported compute capacity will be equal to the estimated
          performance from the table. Values range between 0 and 1023 where
          1023 is the highest capacity available in the system.
+
+# add by gatieme(ChengJean) for SCHED_HMP_ENHANCEMENT
+# end 2016-12-01 16:19
 
 config HAVE_ARM_SCU
 	bool

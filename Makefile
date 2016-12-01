@@ -2,7 +2,7 @@ all	: github
 .PHONY	: github
 
 
-GITHUB_COMMIT	:=	"添加/proc/task_detect查看percpu的task信息, 由选项HEVTASK_INTERFACE开启..."
+GITHUB_COMMIT	:=	"添加Kconfig/arm[64]:ARCH_SCALE_INVARIANT_CPU_CAPACITY, 以支持体系结构底层直接对 CPU Frequency进行修改..."
 
 github	:
 	git pull
