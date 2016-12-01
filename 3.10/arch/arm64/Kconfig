@@ -301,9 +301,9 @@ config HMP_VARIABLE_SCALE
 
 config HMP_FREQUENCY_INVARIANT_SCALE
 	bool "(EXPERIMENTAL) Frequency-Invariant Tracked Load for HMP"
-	depends on HMP_VARIABLE_SCALE && CPU_FREQ
-    depends on !ARCH_SCALE_INVARIANT_CPU_CAPACITY
-    help
+        depends on HMP_VARIABLE_SCALE && CPU_FREQ
+        depends on !ARCH_SCALE_INVARIANT_CPU_CAPACITY
+        help
 	  Scales the current load contribution in line with the frequency
 	  of the CPU that the task was executed on.
 	  In this version, we use a simple linear scale derived from the
