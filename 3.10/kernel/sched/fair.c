@@ -7085,13 +7085,15 @@ static unsigned int hmp_up_migration(int cpu, int *target_cpu, struct sched_enti
 	return 0;
 }
 
-/* Check if task should migrate to a slower cpu */
+/* Check if task should migrate to a slower cpu
+ * 检查当前进程调度实体是否可以被迁移至一个小核
+ * */
 static unsigned int hmp_down_migration(int cpu, struct sched_entity *se)
 {
 	struct task_struct *p = task_of(se);
 	u64 now;
 
-	if (hmp_cpu_is_slowest(cpu)) {
+	if (hmp_cpu_is_slowest(cpu)) {  /*  如果当前调度实体所在的 CPU 已经是小核   */
 #ifdef CONFIG_SCHED_HMP_LITTLE_PACKING
 		if(hmp_packing_enabled)
 			return 1;
