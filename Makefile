@@ -2,7 +2,7 @@ all	: github
 .PHONY	: github
 
 
-GITHUB_COMMIT	:=	"添加Kconfig/arm[64]:ARCH_SCALE_INVARIANT_CPU_CAPACITY, 以支持体系结构底层直接对 CPU Frequency进行修改..."
+GITHUB_COMMIT	:=	"修改体系结构arch/arm64/kernel/topology.c对CONFIG_SCHED_HMP_ENHANCEMENT改进的HMP负载调度器的设置..."
 
 github	:
 	git pull
