@@ -2,7 +2,7 @@ all	: github
 .PHONY	: github
 
 
-GITHUB_COMMIT	:=	"修改体系结构arch/arm64/kernel/topology.c对CONFIG_SCHED_HMP_ENHANCEMENT改进的HMP负载调度器的设置..."
+GITHUB_COMMIT	:=	"完善big.LITTLE-mp..."
 
 github	:
 	git pull
