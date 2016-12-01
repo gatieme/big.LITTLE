@@ -46,6 +46,15 @@
 #include "sched.h"
 
 
+#ifdef CONFIG_HEVTASK_INTERFACE /*  add by gatieme(ChengJean)   */
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
+#ifdef CONFIG_KGDB_KDB
+#include <linux/kdb.h>
+#endif      /*  end of CONFIG_KGDB_KDB                          */
+#endif      /*  end of CONFIG_HEAVTEST_INTERFACE                */
+
+
 /*
  * Targeted preemption latency for CPU-bound tasks:
  * (default: 6ms * (1 + ilog(ncpus)), units: nanoseconds)
@@ -8265,3 +8274,93 @@ static int __init register_sched_cpufreq_notifier(void)
 
 core_initcall(register_sched_cpufreq_notifier);
 #endif /* CONFIG_HMP_FREQUENCY_INVARIANT_SCALE */
+
+
+#ifdef CONFIG_HEVTASK_INTERFACE /*  add by gatieme(ChengJean)*/
+/*  add by gatieme(ChengJean)
+ *  for /proc/task_detect
+ *  to show the hmp information
+ *  per online cpu, show the task_struct in it
+ *  p->se.avg.load_avg_ratio, p->pid, task_cpu(p), (p->utime + p->stime), p->comm
+ *  see https://github.com/meizuosc/m681/blob/master/kernel/sched/fair.c
+ *  */
+
+
+/*
+ *  * This allows printing both to /proc/task_detect and
+ *   * to the console
+ *    */
+#ifndef CONFIG_KGDB_KDB
+#define SEQ_printf(m, x...)			\
+	do {						\
+		if (m)					\
+		seq_printf(m, x);		\
+		else					\
+		pr_debug(x);			\
+	} while (0)
+#else
+#define SEQ_printf(m, x...)			\
+	do {						\
+		if (m)					\
+		seq_printf(m, x);		\
+		else if (__get_cpu_var(kdb_in_use) == 1)		\
+		kdb_printf(x);			\
+		else						\
+		pr_debug(x);				\
+	} while (0)
+#endif
+
+static int task_detect_show(struct seq_file *m, void *v)
+{
+	struct task_struct *p;
+	unsigned long flags;
+	unsigned int i;
+
+#ifdef CONFIG_HMP_FREQUENCY_INVARIANT_SCALE
+	for (i = 0; i < NR_CPUS; i++) {
+		SEQ_printf(m, "%5d ", freq_scale[i].curr_scale);
+	}
+#endif
+
+	SEQ_printf(m, "\n%lu\n ", jiffies_to_cputime(jiffies));
+
+	for (i = 0; i < NR_CPUS; i++) {
+		raw_spin_lock_irqsave(&cpu_rq(i)->lock, flags);
+		if (cpu_online(i)) {
+			list_for_each_entry(p, &cpu_rq(i)->cfs_tasks, se.group_node) {
+				SEQ_printf(m, "%lu %5d %5d %lu (%15s)\n ",
+					   p->se.avg.load_avg_ratio, p->pid, task_cpu(p),
+					   (p->utime + p->stime), p->comm);
+			}
+		}
+		raw_spin_unlock_irqrestore(&cpu_rq(i)->lock, flags);
+
+	}
+
+	return 0;
+}
+
+static int task_detect_open(struct inode *inode, struct file *filp)
+{
+	return single_open(filp, task_detect_show, NULL);
+}
+
+static const struct file_operations task_detect_fops = {
+	.open		= task_detect_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static int __init init_task_detect_procfs(void)
+{
+	struct proc_dir_entry *pe;
+
+	pe = proc_create("task_detect", 0444, NULL, &task_detect_fops);
+	if (!pe)
+		return -ENOMEM;
+	return 0;
+}
+
+__initcall(init_task_detect_procfs);
+#endif /* CONFIG_HEVTASK_INTERFACE */
