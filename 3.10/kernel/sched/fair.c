@@ -1318,6 +1318,11 @@ struct cpufreq_extents {
 	u32 min;
 	u32 max;
 	u32 flags;
+/*      add by gatieme(ChengJean) @ 2012-12-1 19:11     for CONFIG_SCHED_HMP_ENHANCEMENT      */
+#ifdef  CONFIG_SCHED_HMP_ENHANCEMENT            /*      改进的 HMP 负载均衡调度器       */
+        u32 const_max;
+        n32 throttling;
+#endif                          /*      endif   CONFIG_SCHED_HMP_ENHANCEMENT    */
 };
 /* Flag set when the governor in use only allows one frequency.
  * Disables scaling.

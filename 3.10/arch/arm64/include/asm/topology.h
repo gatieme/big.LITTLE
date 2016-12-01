@@ -8,7 +8,7 @@
 struct cpu_topology {
 	int thread_id;
 	int core_id;
-	int cluster_id;
+	int cluster_id;         /*      原来叫做 socket_id      */
 	cpumask_t thread_sibling;
 	cpumask_t core_sibling;
 };
