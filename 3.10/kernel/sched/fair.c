@@ -33,13 +33,13 @@
 #include <trace/events/sched.h>
 #include <linux/sysfs.h>
 #include <linux/vmalloc.h>
-#ifdef CONFIG_HMP_FREQUENCY_INVARIANT_SCALE
+#ifdef CONFIG_HMP_FREQUENCY_INVARIANT_SCALE     /*  HMP 负载调度器需要DVFS调频支持   */
 /* Include cpufreq header to add a notifier so that cpu frequency
  * scaling can track the current CPU frequency
  */
 #include <linux/cpufreq.h>
 #endif /* CONFIG_HMP_FREQUENCY_INVARIANT_SCALE */
-#ifdef CONFIG_SCHED_HMP
+#ifdef CONFIG_SCHED_HMP                         /*  HMP 负载调度器需要 cpuidle 和cpuhotplug 支持  */
 #include <linux/cpuidle.h>
 #endif
 
