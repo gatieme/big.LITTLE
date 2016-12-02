@@ -20,6 +20,22 @@ extern struct cpu_topology cpu_topology[NR_CPUS];
 #define topology_core_cpumask(cpu)	(&cpu_topology[cpu].core_sibling)
 #define topology_thread_cpumask(cpu)	(&cpu_topology[cpu].thread_sibling)
 
+/*      add by gatieme @ 2016-12-02 13:51       */
+#ifdef CONFIG_ARCH_SCALE_INVARIANT_CPU_CAPACITY
+
+#define topology_max_cpu_capacity(cpu)  (arch_get_max_cpu_capacity(cpu))
+#define topology_cpu_capacity(cpu)      (arch_get_cpu_capacity(cpu))
+#define topology_cpu_throttling(cpu)    (arch_get_cpu_throttling(cpu))
+
+#define CPUPOWER_FREQSCALE_SHIFT 10
+#define CPUPOWER_FREQSCALE_DEFAULT (1L << CPUPOWER_FREQSCALE_SHIFT)
+
+extern int arch_get_invariant_power_enabled(void);
+
+#define topology_cpu_inv_power_en(void) (arch_get_invariant_power_enabled())
+
+#endif /* CONFIG_ARCH_SCALE_INVARIANT_CPU_CAPACITY */
+
 #define mc_capable()	(cpu_topology[0].cluster_id != -1)
 #define smt_capable()	(cpu_topology[0].thread_id != -1)
 

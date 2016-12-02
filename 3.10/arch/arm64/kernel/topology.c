@@ -304,6 +304,88 @@ unsigned long min_capacity = (unsigned long)(-1);
 unsigned long max_capacity = 0;
 #endif
 
+
+#ifdef  CONFIG_SCHED_HMP_ENHANCEMENT    /*      add by gatieme(ChengJean) @ 2016-12-01 20:15    */
+static void __init parse_dt_topology(void)
+{
+    struct cpu_efficiency *cpu_eff;
+    struct device_node *cn = NULL;
+    unsigned long capacity = 0;
+    int alloc_size, cpu = 0;
+
+    alloc_size = nr_cpu_ids * sizeof(struct cpu_capacity);
+    __cpu_capacity = kzalloc(alloc_size, GFP_NOWAIT);
+
+    while ((cn = of_find_node_by_type(cn, "cpu"))) {
+        const u32 *rate, *reg;
+        int len;
+
+        if (cpu >= num_possible_cpus())
+            break;
+
+        for (cpu_eff = table_efficiency; cpu_eff->compatible; cpu_eff++)
+            if (of_device_is_compatible(cn, cpu_eff->compatible))
+                break;
+
+        if (cpu_eff->compatible == NULL)
+            continue;
+
+        rate = of_get_property(cn, "clock-frequency", &len);
+        if (!rate || len != 4) {
+            pr_err("%s missing clock-frequency property\n",
+                   cn->full_name);
+            continue;
+        }
+
+        reg = of_get_property(cn, "reg", &len);
+        if (!reg || len != 4) {
+            pr_err("%s missing reg property\n", cn->full_name);
+            continue;
+        }
+
+        capacity = ((be32_to_cpup(rate)) >> 20) * cpu_eff->efficiency;
+
+        /* Save min capacity of the system */
+        if (capacity < min_capacity)
+            min_capacity = capacity;
+
+        /* Save max capacity of the system */
+        if (capacity > max_capacity)
+            max_capacity = capacity;
+
+        __cpu_capacity[cpu].capacity = capacity;
+        cpu_topology[cpu].core_id = be32_to_cpup(reg) & 0xFF;
+        cpu_topology[cpu].cluster_id = be32_to_cpup(reg) >> 0x8 & 0xFF;
+        //cpu_topology[cpu].socket_id = be32_to_cpup(reg) >> 0x8 & 0xFF;
+        pr_debug("CPU%u: hwid(0x%0x) socket_id(%i) core_id(%i) cap(%lu)\n",
+                 cpu, be32_to_cpup(reg), cpu_topology[cpu].cluster_id, cpu_topology[cpu].core_id, capacity);
+                 //cpu, be32_to_cpup(reg), cpu_topology[cpu].socket_id, cpu_topology[cpu].core_id, capacity);
+        __cpu_capacity[cpu++].hwid = be32_to_cpup(reg);
+    }
+
+    if (cpu < num_possible_cpus())
+        __cpu_capacity[cpu].hwid = (unsigned long)(-1);
+
+    /* If min and max capacities are equals, we bypass the update of the
+     * cpu_scale because all CPUs have the same capacity. Otherwise, we
+     * compute a middle_capacity factor that will ensure that the capacity
+     * of an 'average' CPU of the system will be as close as possible to
+     * SCHED_POWER_SCALE, which is the default value, but with the
+     * constraint explained near table_efficiency[].
+     */
+    if (min_capacity == max_capacity)
+        __cpu_capacity[0].hwid = (unsigned long)(-1);
+    else if (4*max_capacity < (3*(max_capacity + min_capacity)))
+        middle_capacity = (min_capacity + max_capacity)
+            >> (SCHED_POWER_SHIFT+1);
+    else
+        middle_capacity = ((max_capacity / 3)
+                           >> (SCHED_POWER_SHIFT-1)) + 1;
+
+}
+
+#else
+
 /*
  * Iterate all CPUs' descriptor in DT and compute the efficiency
  * (as per table_efficiency). Also calculate a middle efficiency
@@ -354,6 +436,7 @@ out:
 	of_node_put(cn);
 	return ret;
 }
+#endif
 
 static void __init parse_dt_cpu_power(void)
 {
@@ -372,7 +455,7 @@ static void __init parse_dt_cpu_power(void)
 
 	for_each_possible_cpu(cpu) {
 		const u32 *rate;
-#ifndef  CONFIG_SCHED_HMP_ENHANCEMENT    /*      add by gatieme(ChengJean) @ 2016-12-01 20:08*/
+#ifdef  CONFIG_SCHED_HMP_ENHANCEMENT    /*      add by gatieme(ChengJean) @ 2016-12-01 20:08*/
                 const u32 *reg;
 #endif
 		int len;
@@ -420,9 +503,11 @@ static void __init parse_dt_cpu_power(void)
                 cpu_capacity(cpu) = capacity;
 #ifdef  CONFIG_SCHED_HMP_ENHANCEMENT    /*      add by gatieme(ChengJean) @ 2016-12-01 20:08*/
                 cpu_topology[cpu].core_id = be32_to_cpup(reg) & 0xFF;
-                cpu_topology[cpu].socket_id = be32_to_cpup(reg) >> 0x8 & 0xFF;
+                cpu_topology[cpu].cluster_id = be32_to_cpup(reg) >> 0x8 & 0xFF;
+                //cpu_topology[cpu].socket_id = be32_to_cpup(reg) >> 0x8 & 0xFF;
                 pr_debug("CPU%u: hwid(0x%0x) socket_id(%i) core_id(%i) cap(%lu)\n",
-                                cpu, be32_to_cpup(reg), cpu_topology[cpu].socket_id, cpu_topology[cpu].core_id, capacity);
+                                cpu, be32_to_cpup(reg), cpu_topology[cpu].cluster_id, cpu_topology[cpu].core_id, capacity);
+                                //cpu, be32_to_cpup(reg), cpu_topology[cpu].socket_id, cpu_topology[cpu].core_id, capacity);
 
                 __cpu_capacity[cpu].hwid = be32_to_cpup(reg);
 #endif
@@ -1166,7 +1251,7 @@ int arch_get_cpu_throttling(int cpu)
 /* range: 1 ~  (1 << SCHED_POWER_SHIFT) */
 int arch_cpu_cap_ratio(unsigned int cpu)
 {
-	unsigned long ratio = (cpu_capacity[cpu].capacity << SCHED_POWER_SHIFT) / max_capacity;
+	unsigned long ratio = (__cpu_capacity[cpu].capacity << SCHED_POWER_SHIFT) / max_capacity;
 	BUG_ON(cpu >= num_possible_cpus());
 	return (int)ratio;
 }
@@ -1219,7 +1304,7 @@ void arch_get_cluster_cpus(struct cpumask *cpus, int cluster_id)
 
 	cpumask_clear(cpus);
 	for_each_possible_cpu(cpu) {
-		struct cputopo_arm *arm_cputopo = &cpu_topology[cpu];
+		struct cpu_topology *arm_cputopo = &cpu_topology[cpu];
 		if (arm_cputopo->cluster_id == cluster_id)
 			cpumask_set_cpu(cpu, cpus);
 	}
@@ -1244,7 +1329,7 @@ int arch_better_capacity(unsigned int cpu)
 	return __cpu_capacity[cpu].capacity > min_capacity;
 }
 
-
+#endif          /*	ifdef  CONFIG_SCHED_HMP_ENHANCEMENT	else    */
 
 #endif /* CONFIG_SCHED_HMP */
 
