@@ -2,7 +2,7 @@ all	: github
 .PHONY	: github
 
 
-GITHUB_COMMIT	:=	"完善big.LITTLE-mp..."
+GITHUB_COMMIT	:=	"初步完成big.LITTLE-mp下CONFIG_SCHED_HMP_ENHANCEMENT负载均衡调度器..."
 
 github	:
 	git pull
