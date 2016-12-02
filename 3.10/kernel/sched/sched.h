@@ -266,13 +266,17 @@ struct cfs_rq {
  * removed when useful for applications beyond shares distribution (e.g.
  * load-balance).
  */
-#ifdef CONFIG_FAIR_GROUP_SCHED
 	/*
 	 * CFS Load tracking
 	 * Under CFS, load is tracked on a per-entity basis and aggregated up.
 	 * This allows for the description of both thread and group usage (in
 	 * the FAIR_GROUP_SCHED case).
 	 */
+#ifdef CONFIG_SCHED_HMP /*      add by gatieme for per runqueue's avg tracking  */
+        struct sched_avg avg;
+#endif  /*      CONFIG_SCHED_HMP_ENHANCEMENT    */
+
+#ifdef CONFIG_FAIR_GROUP_SCHED
 	u64 runnable_load_avg, blocked_load_avg;
 	atomic64_t decay_counter, removed_load;
 	u64 last_decay;
@@ -524,7 +528,7 @@ struct rq {
 	struct llist_head wake_list;
 #endif
 
-	struct sched_avg avg;
+	struct sched_avg avg;   /*      for per cpu runqueue's load tracking    */
 };
 
 static inline int cpu_of(struct rq *rq)

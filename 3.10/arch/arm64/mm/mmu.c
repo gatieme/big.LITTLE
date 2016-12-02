@@ -330,7 +330,16 @@ void __init paging_init(void)
 	empty_zero_page = virt_to_page(zero_page);
 
 	/* Ensure the zero page is visible to the page table walker */
-	dsb();
+	/*      modify `dsb()` to `dsb(64)`     for fix the next error
+         * /tmp/ccbrt8LJ.s:560: Error: missing immediate expression at operand 1 -- `dsb ''`
+         * The problem was different semantics of dsb on btw arm32 and arm64,
+         * Here we can convert the dsb with insteading of dsb(sy).The "sy" param
+         * is the default which you are allow to omit, so on arm32 dsb()and dsb(sy)
+         * are the same.
+         *
+         * see http://www.gossamer-threads.com/lists/linux/kernel/2292794
+         * */
+        dsb(sy);
 
 	/*
 	 * TTBR0 is only used for the identity mapping at this stage. Make it

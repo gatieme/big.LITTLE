@@ -905,6 +905,16 @@ struct hmp_domain {
 	struct cpumask possible_cpus;   /*  所有可以运行的 CPU 的 mask 标志     */
 	struct list_head hmp_domains;   /*  链表指针域                          */
 };
+
+#ifdef CONFIG_SCHED_HMP_ENHANCEMENT
+#ifdef CONFIG_HMP_TRACER
+struct hmp_statisic {
+        unsigned int nr_force_up;   /* The number of task force up-migration */
+        unsigned int nr_force_down; /* The number of task force down-migration */
+};
+
+#endif /* CONFIG_HMP_TRACER */
+#endif /* CONFIG_SCHED_HMP_ENHANCEMENT */
 #endif /* CONFIG_SCHED_HMP */
 #else /* CONFIG_SMP */
 
@@ -960,9 +970,18 @@ struct sched_avg {
 	unsigned long load_avg_contrib;
 	unsigned long load_avg_ratio;       /*  进程可运行时间的一个比率                */
 #ifdef CONFIG_SCHED_HMP
+
+#ifdef CONFIG_SCHED_HMP_ENHANCEMENT
+        unsigned long pending_load;
+        u32 nr_pending;
+#ifdef CONFIG_SCHED_HMP_PRIO_FILTER
+        u32 nr_dequeuing_low_prio;
+        u32 nr_normal_prio;
+#endif          /*      CONFIG_SCHED_HMP_PRIO_FILTER   */
+#endif  /*      CONFIG_SCHED_HMP_PRIO_FILTER    */
 	u64 hmp_last_up_migration;          /*  记录当前进程调度实体上次向上迁移的时间  */
 	u64 hmp_last_down_migration;        /*  记录当前进程调度实体上次向下迁移的时间  */
-#endif
+#endif /* CONFIG_SCHED_HMP */
 	u32 usage_avg_sum;                  /*  进程处于运行状态的负载                  */
 };
 

@@ -37,14 +37,14 @@
 #include <linux/vmalloc.h>
 #endif
 
-#ifdef CONFIG_HMP_FREQUENCY_INVARIANT_SCALE     /*  HMP è´Ÿè½½è°ƒåº¦å™¨éœ€è¦DVFSè°ƒé¢‘æ”¯æŒ   */
+#ifdef CONFIG_HMP_FREQUENCY_INVARIANT_SCALE     /*  HMP ¸ºÔØµ÷¶ÈÆ÷ĞèÒªDVFSµ÷ÆµÖ§³Ö   */
 /* Include cpufreq header to add a notifier so that cpu frequency
  * scaling can track the current CPU frequency
  */
 #include <linux/cpufreq.h>
 #endif /* CONFIG_HMP_FREQUENCY_INVARIANT_SCALE */
 
-#ifdef CONFIG_SCHED_HMP                         /*  HMP è´Ÿè½½è°ƒåº¦å™¨éœ€è¦ cpuidle å’Œcpuhotplug æ”¯æŒ  */
+#ifdef CONFIG_SCHED_HMP                         /*  HMP ¸ºÔØµ÷¶ÈÆ÷ĞèÒª cpuidle ºÍcpuhotplug Ö§³Ö  */
 #include <linux/cpuidle.h>
 #endif
 
@@ -1526,7 +1526,7 @@ struct hmp_global_attr {
  *  #endif
  *  hmp
  * */
-struct hmp_data_struct {            /*  sysfs æ–‡ä»¶ç³»ç»Ÿçš„æ“ä½œæ¥å£    */
+struct hmp_data_struct {            /*  sysfs ÎÄ¼şÏµÍ³µÄ²Ù×÷½Ó¿Ú    */
 #ifdef CONFIG_HMP_FREQUENCY_INVARIANT_SCALE
         int freqinvar_load_scale_enabled;
 #endif
@@ -1585,7 +1585,7 @@ struct cpufreq_extents {
         u32 max;
         u32 flags;
 /*      add by gatieme(ChengJean) @ 2012-12-1 19:11     for CONFIG_SCHED_HMP_ENHANCEMENT      */
-#ifdef  CONFIG_SCHED_HMP_ENHANCEMENT            /*      æ”¹è¿›çš„ HMP è´Ÿè½½å‡è¡¡è°ƒåº¦å™¨       */
+#ifdef  CONFIG_SCHED_HMP_ENHANCEMENT            /*      ¸Ä½øµÄ HMP ¸ºÔØ¾ùºâµ÷¶ÈÆ÷       */
         u32 const_max;
         n32 throttling;
 #endif                          /*      endif   CONFIG_SCHED_HMP_ENHANCEMENT    */
@@ -4364,7 +4364,7 @@ static void hmp_cpu_keepalive_cancel(int cpu)
 
 /* Setup hmp_domains
  *
- * è°ƒç”¨å…³ç³»
+ * µ÷ÓÃ¹ØÏµ
  * init_sched_fair_class( )
  *  ->  hmp_cpu_mask_setup( )
  * */
@@ -4466,18 +4466,18 @@ static inline struct hmp_domain *hmp_slower_domain(int cpu);
 static inline struct hmp_domain *hmp_faster_domain(int cpu);
 
 /* must hold runqueue lock for queue se is currently on
- * æŸ¥æ‰¾å¹¶è¿”å›CPU(target_cpu)ä¸Šæœ€ç¹å¿™çš„è¿›ç¨‹,
+ * ²éÕÒ²¢·µ»ØCPU(target_cpu)ÉÏ×î·±Ã¦µÄ½ø³Ì,
  *
- * å‚æ•°æè¿°
- * se           è¯¥ CPU çš„å½“å‰è¿›ç¨‹currçš„è°ƒåº¦å®ä½“
- * target_cpu   è¯¥ CPU çš„ç¼–å·, å¦‚æœä¼ å…¥-1, åˆ™è¡¨ç¤ºç›®æ ‡è¿è¡Œçš„cpuä¸ºå¤§æ ¸è°ƒåº¦åŸŸä¸­ä»»ä½•ä¸€ä¸ªåˆé€‚çš„å¤§æ ¸
- *                             å¦‚æœä¼ å…¥>0, åˆ™è¡¨ç¤ºä»»åŠ¡å°†è¦è¿ç§»åˆ°çš„ç›®æ ‡å¤§æ ¸cpu
+ * ²ÎÊıÃèÊö
+ * se           ¸Ã CPU µÄµ±Ç°½ø³ÌcurrµÄµ÷¶ÈÊµÌå
+ * target_cpu   ¸Ã CPU µÄ±àºÅ, Èç¹û´«Èë-1, Ôò±íÊ¾Ä¿±êÔËĞĞµÄcpuÎª´óºËµ÷¶ÈÓòÖĞÈÎºÎÒ»¸öºÏÊÊµÄ´óºË
+ *                             Èç¹û´«Èë>0, Ôò±íÊ¾ÈÎÎñ½«ÒªÇ¨ÒÆµ½µÄÄ¿±ê´óºËcpu
  *
- * è¿”å›å€¼
- *  å¦‚æœè°ƒåº¦å®ä½“ se æ‰€å¤„çš„ CPU æ˜¯å¤§æ ¸, åˆ™ç›´æ¥è¿”å›  se
- *  å¦‚æœtarget_cpu > 0, ä½†æ˜¯å´ä¸åœ¨å¤§æ ¸çš„è°ƒåº¦åŸŸä¸­, å³è¯¥ç›®æ ‡ CPU æ˜¯å°æ ¸, åˆ™è¿”å›NULL
- *  å…¶ä»–æƒ…å†µå‚æ•°æ­£ç¡®ä¸”åˆæ³•(seä¸ºå°æ ¸ä¸Šçš„æŸä¸ªè°ƒåº¦å®ä½“, target_cpu ä¸º-1æˆ–è€…æŸä¸ªå¤§æ ¸),
- *  åˆ™è¿”å›seæ‰€åœ¨çš„CPUä¸Šè´Ÿè½½æœ€å¤§çš„é‚£ä¸ªè°ƒåº¦å®ä½“ max_se
+ * ·µ»ØÖµ
+ *  Èç¹ûµ÷¶ÈÊµÌå se Ëù´¦µÄ CPU ÊÇ´óºË, ÔòÖ±½Ó·µ»Ø  se
+ *  Èç¹ûtarget_cpu > 0, µ«ÊÇÈ´²»ÔÚ´óºËµÄµ÷¶ÈÓòÖĞ, ¼´¸ÃÄ¿±ê CPU ÊÇĞ¡ºË, Ôò·µ»ØNULL
+ *  ÆäËûÇé¿ö²ÎÊıÕıÈ·ÇÒºÏ·¨(seÎªĞ¡ºËÉÏµÄÄ³¸öµ÷¶ÈÊµÌå, target_cpu Îª-1»òÕßÄ³¸ö´óºË),
+ *  Ôò·µ»ØseËùÔÚµÄCPUÉÏ¸ºÔØ×î´óµÄÄÇ¸öµ÷¶ÈÊµÌå max_se
  * */
 static struct sched_entity *hmp_get_heaviest_task(
                                 struct sched_entity *se, int target_cpu)
@@ -4488,27 +4488,27 @@ static struct sched_entity *hmp_get_heaviest_task(
         const struct cpumask *hmp_target_mask = NULL;
         struct hmp_domain *hmp;
 
-        if (hmp_cpu_is_fastest(cpu_of(se->cfs_rq->rq))) /*  åˆ¤æ–­è¯¥ CPU æ˜¯å¦å¤„äºå¤§æ ¸ CPU çš„è°ƒåº¦åŸŸä¸­  */
-                return max_se;                              /*  å¦‚æœæ˜¯åˆ™ç›´æ¥è¿”å›å½“å‰è¿›ç¨‹çš„è°ƒåº¦å®ä½“      */
+        if (hmp_cpu_is_fastest(cpu_of(se->cfs_rq->rq))) /*  ÅĞ¶Ï¸Ã CPU ÊÇ·ñ´¦ÓÚ´óºË CPU µÄµ÷¶ÈÓòÖĞ  */
+                return max_se;                              /*  Èç¹ûÊÇÔòÖ±½Ó·µ»Øµ±Ç°½ø³ÌµÄµ÷¶ÈÊµÌå      */
 
         hmp = hmp_faster_domain(cpu_of(se->cfs_rq->rq));
-        hmp_target_mask = &hmp->cpus;                   /*  æŒ‡å‘å¤§æ ¸è°ƒåº¦åŸŸä¸­cpumaskä½å›¾             */
-        if (target_cpu >= 0) {                          /*  å¦‚æœå‚æ•°target_cpuä¼ å…¥çš„æ˜¯å®é™…çš„CPUç¼–å· */
+        hmp_target_mask = &hmp->cpus;                   /*  Ö¸Ïò´óºËµ÷¶ÈÓòÖĞcpumaskÎ»Í¼             */
+        if (target_cpu >= 0) {                          /*  Èç¹û²ÎÊıtarget_cpu´«ÈëµÄÊÇÊµ¼ÊµÄCPU±àºÅ */
                 /* idle_balance gets run on a CPU while
                  * it is in the middle of being hotplugged
                  * out. Bail early in that case.
                  */
-                if(!cpumask_test_cpu(target_cpu, hmp_target_mask))  /*  åˆ¤æ–­target_cpuæ˜¯å¦åœ¨å¤§æ ¸çš„è°ƒåº¦åŸŸå†…  */
-                        return NULL;                                    /*  å¦‚æœæŒ‡å®šçš„target_cpuä¸æ˜¯å¤§æ ¸,
-                                                                åˆ™å½“å‰æ“ä½œä¸ºå¸Œæœ›ä»ä¸€ä¸ªå°æ ¸ä¸Šè¿”å›ä¸€ä¸ªæœ€ç¹å¿™çš„è¿›ç¨‹,
-                                                                å´è¦æŠŠè¯¥è¿›ç¨‹æ”¾åˆ°å¦å¤–ä¸€ä¸ªå°æ ¸target_cpuä¸Š, è¿”å›NULL    */
-                hmp_target_mask = cpumask_of(target_cpu);           /*  è®¾ç½®maskä¿¡æ¯ä¸ºæŒ‡å®šçš„target_cpuçš„maskä¿¡æ¯    */
+                if(!cpumask_test_cpu(target_cpu, hmp_target_mask))  /*  ÅĞ¶Ïtarget_cpuÊÇ·ñÔÚ´óºËµÄµ÷¶ÈÓòÄÚ  */
+                        return NULL;                                    /*  Èç¹ûÖ¸¶¨µÄtarget_cpu²»ÊÇ´óºË,
+                                                                Ôòµ±Ç°²Ù×÷ÎªÏ£Íû´ÓÒ»¸öĞ¡ºËÉÏ·µ»ØÒ»¸ö×î·±Ã¦µÄ½ø³Ì,
+                                                                È´Òª°Ñ¸Ã½ø³Ì·Åµ½ÁíÍâÒ»¸öĞ¡ºËtarget_cpuÉÏ, ·µ»ØNULL    */
+                hmp_target_mask = cpumask_of(target_cpu);           /*  ÉèÖÃmaskĞÅÏ¢ÎªÖ¸¶¨µÄtarget_cpuµÄmaskĞÅÏ¢    */
         }
         /* The currently running task is not on the runqueue
-     * curr è¿›ç¨‹æ˜¯ä¸åœ¨ CPU çš„è¿è¡Œé˜Ÿåˆ—é‡Œé¢çš„ */
+     * curr ½ø³ÌÊÇ²»ÔÚ CPU µÄÔËĞĞ¶ÓÁĞÀïÃæµÄ */
         se = __pick_first_entity(cfs_rq_of(se));
 
-        while (num_tasks && se) {   /*  ä»å½“å‰CPU çš„çº¢é»‘æ ‘ä¸­æ‰¾å‡ºè´Ÿè½½æœ€å¤§çš„é‚£ä¸ªè°ƒåº¦å®ä½“max_se    */
+        while (num_tasks && se) {   /*  ´Óµ±Ç°CPU µÄºìºÚÊ÷ÖĞÕÒ³ö¸ºÔØ×î´óµÄÄÇ¸öµ÷¶ÈÊµÌåmax_se    */
                 if (entity_is_task(se) &&
                         se->avg.load_avg_ratio > max_ratio &&
                         cpumask_intersects(hmp_target_mask,
@@ -4523,14 +4523,14 @@ static struct sched_entity *hmp_get_heaviest_task(
         return max_se;
 }
 
-/*  hmp_get_lightest_task()å‡½æ•°å’Œ hmp_get_heaviest_task()å‡½æ•°ç±»ä¼¼,
- *  è¿”å› se è°ƒåº¦å®ä½“å¯¹åº”çš„è¿è¡Œé˜Ÿåˆ—ä¸­ä»»åŠ¡æœ€è½»çš„è°ƒåº¦å®ä½“ min_se
+/*  hmp_get_lightest_task()º¯ÊıºÍ hmp_get_heaviest_task()º¯ÊıÀàËÆ,
+ *  ·µ»Ø se µ÷¶ÈÊµÌå¶ÔÓ¦µÄÔËĞĞ¶ÓÁĞÖĞÈÎÎñ×îÇáµÄµ÷¶ÈÊµÌå min_se
  *
- *  å‚æ•°
- *      se              è°ƒåº¦å®ä½“æŒ‡ç¤ºäº†å¾…å¤„ç†çš„è°ƒåº¦å®ä½“, å…¶æ‰€åœ¨çš„è¿è¡Œé˜Ÿåˆ— å’Œ CPU
- *      migrate_down    æ§åˆ¶å˜é‡, ä¼ å…¥1, è¡¨ç¤ºæ£€æŸ¥æ˜¯å¦å¯ä»¥è¿›è¡Œå‘ä¸‹è¿ç§»(å°†ä»»åŠ¡ä»å¤§æ ¸è¿ç§»åˆ°å°æ ¸)
+ *  ²ÎÊı
+ *      se              µ÷¶ÈÊµÌåÖ¸Ê¾ÁË´ı´¦ÀíµÄµ÷¶ÈÊµÌå, ÆäËùÔÚµÄÔËĞĞ¶ÓÁĞ ºÍ CPU
+ *      migrate_down    ¿ØÖÆ±äÁ¿, ´«Èë1, ±íÊ¾¼ì²éÊÇ·ñ¿ÉÒÔ½øĞĞÏòÏÂÇ¨ÒÆ(½«ÈÎÎñ´Ó´óºËÇ¨ÒÆµ½Ğ¡ºË)
  *
- *  è°ƒç”¨å…³ç³»
+ *  µ÷ÓÃ¹ØÏµ
  *      run_rebalance_domains( )
  *          ->  hmp_force_up_migration( )
  *              ->  hmp_get_lightest_task( )
@@ -4543,9 +4543,9 @@ static struct sched_entity *hmp_get_lightest_task(
         unsigned long int min_ratio = se->avg.load_avg_ratio;
         const struct cpumask *hmp_target_mask = NULL;
 
-        if (migrate_down) {         /*  è¿›è¡Œå‘ä¸‹è¿ç§», å°†ä»»åŠ¡ä»å¤§æ ¸è¿ç§»åˆ°å°æ ¸    */
+        if (migrate_down) {         /*  ½øĞĞÏòÏÂÇ¨ÒÆ, ½«ÈÎÎñ´Ó´óºËÇ¨ÒÆµ½Ğ¡ºË    */
                 struct hmp_domain *hmp;
-                if (hmp_cpu_is_slowest(cpu_of(se->cfs_rq->rq))) /*  æ£€æŸ¥å½“å‰seæ‰€åœ¨çš„cpuæ˜¯ä¸æ˜¯å¤§æ ¸, å¦‚æœä¸æ˜¯, åˆ™ç›´æ¥è¿”å› min_se = se   */
+                if (hmp_cpu_is_slowest(cpu_of(se->cfs_rq->rq))) /*  ¼ì²éµ±Ç°seËùÔÚµÄcpuÊÇ²»ÊÇ´óºË, Èç¹û²»ÊÇ, ÔòÖ±½Ó·µ»Ø min_se = se   */
                         return min_se;
                 hmp = hmp_slower_domain(cpu_of(se->cfs_rq->rq));
                 hmp_target_mask = &hmp->cpus;
@@ -4553,7 +4553,7 @@ static struct sched_entity *hmp_get_lightest_task(
         /* The currently running task is not on the runqueue */
         se = __pick_first_entity(cfs_rq_of(se));
 
-        while (num_tasks && se) {               /*  ä» se æ‰€åœ¨ CPU çš„ä»»åŠ¡é˜Ÿåˆ—ä¸Šæ‰¾åˆ°é‚£ä¸ªè´Ÿè½½æœ€å°çš„è¿›ç¨‹ */
+        while (num_tasks && se) {               /*  ´Ó se ËùÔÚ CPU µÄÈÎÎñ¶ÓÁĞÉÏÕÒµ½ÄÇ¸ö¸ºÔØ×îĞ¡µÄ½ø³Ì */
                 if (entity_is_task(se) &&
                         (se->avg.load_avg_ratio < min_ratio &&
                         hmp_target_mask &&
@@ -4635,12 +4635,12 @@ unsigned int hmp_next_down_threshold = 4096;
 
 
 #ifdef CONFIG_SCHED_HMP_LITTLE_PACKING
-/* å°ä»»åŠ¡å°åŒ…è¡¥ä¸, å°†è´Ÿè½½å°äºNICE_0 80% çš„è¿›ç¨‹, çœ‹åšæ˜¯å°ä»»åŠ¡
- * å°†è¿™äº›å°ä»»åŠ¡æ‰“åŒ…æˆä¸€ä¸ªä»»åŠ¡æ¥çœ‹å¾…, ä»–ä»¬å…±äº«è´Ÿè½½å’Œ CPU é¢‘ç‡
- * å¯ä»¥æŸ¥çœ‹æ–‡æ¡£ Documentation/arm/small_task_packing.txt
- * å¦‚æœç³»ç»Ÿä¸­å°ä»»åŠ¡æ¯”è¾ƒå¤š, é‚£ä¹ˆä¼šå°†è¿™äº›å°ä»»åŠ¡è¿›è¡Œå°åŒ…è°ƒæ•´, è¿ç§»åˆ°ä¸€ä¸ªå°æ ¸ CPU ä¸Š
- * ç›´åˆ°è¯¥æ ¸ä¸Šæ‰€æœ‰è¿è¡Œçš„å°ä»»åŠ¡çš„æ€»è´Ÿè½½è¾¾åˆ°äº† /sys/kernel/hmp/packing_limit
- * è¿™äº›å°ä»»åŠ¡å°±è¢«å°è£…æˆäº†ä¸€ä¸ªä»»åŠ¡åŒ…
+/* Ğ¡ÈÎÎñ·â°ü²¹¶¡, ½«¸ºÔØĞ¡ÓÚNICE_0 80% µÄ½ø³Ì, ¿´×öÊÇĞ¡ÈÎÎñ
+ * ½«ÕâĞ©Ğ¡ÈÎÎñ´ò°ü³ÉÒ»¸öÈÎÎñÀ´¿´´ı, ËûÃÇ¹²Ïí¸ºÔØºÍ CPU ÆµÂÊ
+ * ¿ÉÒÔ²é¿´ÎÄµµ Documentation/arm/small_task_packing.txt
+ * Èç¹ûÏµÍ³ÖĞĞ¡ÈÎÎñ±È½Ï¶à, ÄÇÃ´»á½«ÕâĞ©Ğ¡ÈÎÎñ½øĞĞ·â°üµ÷Õû, Ç¨ÒÆµ½Ò»¸öĞ¡ºË CPU ÉÏ
+ * Ö±µ½¸ÃºËÉÏËùÓĞÔËĞĞµÄĞ¡ÈÎÎñµÄ×Ü¸ºÔØ´ïµ½ÁË /sys/kernel/hmp/packing_limit
+ * ÕâĞ©Ğ¡ÈÎÎñ¾Í±»·â×°³ÉÁËÒ»¸öÈÎÎñ°ü
  *
  * Set the default packing threshold to try to keep little
  * CPUs at no more than 80% of their maximum frequency if only
@@ -5133,17 +5133,17 @@ late_initcall(hmp_attr_init);
  *     all the same, the first in the set will be used
  *   + if affinity is not set, cpu_online_mask is used
  *
- *   å‚æ•°
- *   hmpd       HMPè°ƒåº¦åŸŸ, ä¸€èˆ¬æ¥è¯´ä¼ å…¥çš„æ˜¯å¤§æ ¸çš„è°ƒåº¦åŸŸ
- *   min_cpu    æ˜¯ä¸€ä¸ªæŒ‡é’ˆå˜é‡ç”¨æ¥ä¼ é€’ç»“æœç»™è°ƒç”¨è€…
- *   affinify   æ˜¯å¦å¤–ä¸€ä¸ªcpumaskä½å›¾, åœ¨æˆ‘ä»¬ä¸Šä¸‹æ–‡ä¸­æ˜¯åˆšæ‰è®¨è®ºçš„è¿›ç¨‹å¯ä»¥è¿è¡Œçš„ CPU ä½å›¾,
- *              ä¸€èˆ¬æ¥è¯´è¿›ç¨‹é€šå¸¸éƒ½è¿è¡Œåœ¨æ‰€æœ‰çš„CPUä¸Šè¿è¡Œ
+ *   ²ÎÊı
+ *   hmpd       HMPµ÷¶ÈÓò, Ò»°ãÀ´Ëµ´«ÈëµÄÊÇ´óºËµÄµ÷¶ÈÓò
+ *   min_cpu    ÊÇÒ»¸öÖ¸Õë±äÁ¿ÓÃÀ´´«µİ½á¹û¸øµ÷ÓÃÕß
+ *   affinify   ÊÇÁíÍâÒ»¸öcpumaskÎ»Í¼, ÔÚÎÒÃÇÉÏÏÂÎÄÖĞÊÇ¸Õ²ÅÌÖÂÛµÄ½ø³Ì¿ÉÒÔÔËĞĞµÄ CPU Î»Í¼,
+ *              Ò»°ãÀ´Ëµ½ø³ÌÍ¨³£¶¼ÔËĞĞÔÚËùÓĞµÄCPUÉÏÔËĞĞ
  *
- *   è¿”å›å€¼
- *   0      è¿”å›0, è¡¨ç¤ºæ‰¾åˆ°äº†ç©ºé—²çš„CPU, å¹¶ç”¨ min_cpu è¿”å›æ‰¾åˆ°çš„ cpu çš„ç¼–å·
- *   1023   è¿”å›1023, è¡¨ç¤ºè¯¥è°ƒåº¦åŸŸæ²¡æœ‰ç©ºé—²CPUä¹Ÿå³æ˜¯éƒ½åœ¨ç¹å¿™ä¸­
+ *   ·µ»ØÖµ
+ *   0      ·µ»Ø0, ±íÊ¾ÕÒµ½ÁË¿ÕÏĞµÄCPU, ²¢ÓÃ min_cpu ·µ»ØÕÒµ½µÄ cpu µÄ±àºÅ
+ *   1023   ·µ»Ø1023, ±íÊ¾¸Ãµ÷¶ÈÓòÃ»ÓĞ¿ÕÏĞCPUÒ²¼´ÊÇ¶¼ÔÚ·±Ã¦ÖĞ
  *
- *   è°ƒç”¨å…³ç³»
+ *   µ÷ÓÃ¹ØÏµ
  *   run_rebalance_domains( )
  *      ->  hmp_force_up_migration( )
  *          ->  hmp_up_migration( )
@@ -5165,31 +5165,31 @@ static inline unsigned int hmp_domain_min_load(struct hmp_domain *hmpd,
          * otherwise look at all online CPUs in the
          * right HMP domain
      *
-     * æ£€æŸ¥hmpd è°ƒåº¦åŸŸä¸Š cpumask å’Œ affinity ä½å›¾
+     * ¼ì²éhmpd µ÷¶ÈÓòÉÏ cpumask ºÍ affinity Î»Í¼
          */
         cpumask_and(&temp_cpumask, &hmpd->cpus, affinity ? affinity : cpu_online_mask);
 
-        for_each_cpu_mask(cpu, temp_cpumask) {  /*  éå† temp_cpumask ä½å›¾ä¸Šçš„æ‰€æœ‰ CPU      */
-                avg = &cpu_rq(cpu)->avg;            /*  è·å–å½“å‰æ£€æŸ¥çš„ cpu ä¸Šè¿è¡Œé˜Ÿåˆ—çš„å¹³å‡è´Ÿè½½ */
+        for_each_cpu_mask(cpu, temp_cpumask) {  /*  ±éÀú temp_cpumask Î»Í¼ÉÏµÄËùÓĞ CPU      */
+                avg = &cpu_rq(cpu)->avg;            /*  »ñÈ¡µ±Ç°¼ì²éµÄ cpu ÉÏÔËĞĞ¶ÓÁĞµÄÆ½¾ù¸ºÔØ */
                 /* used for both up and down migration */
                 curr_last_migration = avg->hmp_last_up_migration ?
                         avg->hmp_last_up_migration : avg->hmp_last_down_migration;
 
-                contrib = avg->load_avg_ratio;      /*  è·å–å¹³å‡è´Ÿè½½ä¿¡æ¯ avg->load_avg_ratio    */
+                contrib = avg->load_avg_ratio;      /*  »ñÈ¡Æ½¾ù¸ºÔØĞÅÏ¢ avg->load_avg_ratio    */
                 /*
                  * Consider a runqueue completely busy if there is any load
                  * on it. Definitely not the best for overall fairness, but
                  * does well in typical Android use cases.
                  */
-                if (contrib)                        /*  å¦‚æœå½“å‰ cpu ä¸Šæœ‰è´Ÿè½½(load_avg_ratio)   */
-                        contrib = 1023;                 /*  é‚£ä¹ˆ contrib ç»Ÿç»Ÿè®¾ç½®ä¸º 1023,
-            ä¸ºä½•è¿™æ ·åšå‘¢?   å› ä¸ºè¯¥å‡½æ•°çš„ç›®çš„å°±æ˜¯æ‰¾ä¸€ä¸ªç©ºé—²CPU, å¦‚æœå½“å‰CPUæœ‰è´Ÿè½½, è¯´æ˜ä¸ç©ºé—²,
-            å› æ­¤ç»Ÿä¸€è®¾ç½®ä¸º 1023, ä»…ä»…æ˜¯ä¸ºäº†è¡¨ç¤ºè¯¥CPUä¸æ˜¯ç©ºé—²è€Œå·²
-            åŒæ—¶ä¸€è¶Ÿéå†ä¸‹æ¥, å¦‚æœæ²¡æœ‰ç©ºé—²CPU, åˆ™æœ€å°è´Ÿè½½å€¼å€¼éƒ½æ˜¯ 1023  */
+                if (contrib)                        /*  Èç¹ûµ±Ç° cpu ÉÏÓĞ¸ºÔØ(load_avg_ratio)   */
+                        contrib = 1023;                 /*  ÄÇÃ´ contrib Í³Í³ÉèÖÃÎª 1023,
+            ÎªºÎÕâÑù×öÄØ?   ÒòÎª¸Ãº¯ÊıµÄÄ¿µÄ¾ÍÊÇÕÒÒ»¸ö¿ÕÏĞCPU, Èç¹ûµ±Ç°CPUÓĞ¸ºÔØ, ËµÃ÷²»¿ÕÏĞ,
+            Òò´ËÍ³Ò»ÉèÖÃÎª 1023, ½ö½öÊÇÎªÁË±íÊ¾¸ÃCPU²»ÊÇ¿ÕÏĞ¶øÒÑ
+            Í¬Ê±Ò»ÌË±éÀúÏÂÀ´, Èç¹ûÃ»ÓĞ¿ÕÏĞCPU, Ôò×îĞ¡¸ºÔØÖµÖµ¶¼ÊÇ 1023  */
 
                 if ((contrib < min_runnable_load) ||
-                        (contrib == min_runnable_load &&                        /*  å¦‚æœæœ‰å¤šä¸ª CPU çš„ contrib å€¼ç›¸åŒ            */
-                         curr_last_migration < min_target_last_migration)) {    /*  é‚£ä¹ˆé€‰æ‹©è¯¥è°ƒåº¦åŸŸä¸­æœ€è¿‘ä¸€ä¸ªå‘ç”Ÿè¿‡è¿ç§»çš„CPU   */
+                        (contrib == min_runnable_load &&                        /*  Èç¹ûÓĞ¶à¸ö CPU µÄ contrib ÖµÏàÍ¬            */
+                         curr_last_migration < min_target_last_migration)) {    /*  ÄÇÃ´Ñ¡Ôñ¸Ãµ÷¶ÈÓòÖĞ×î½üÒ»¸ö·¢Éú¹ıÇ¨ÒÆµÄCPU   */
                         /*
                          * if the load is the same target the CPU with
                          * the longest time since a migration.
@@ -5225,10 +5225,10 @@ static inline unsigned int hmp_task_starvation(struct sched_entity *se)
         return scale_load(starvation);
 }
 
-/*  ä¸º(å¤§æ ¸ä¸Š)è´Ÿè½½æœ€è½»çš„è¿›ç¨‹è°ƒåº¦å®ä½“ se é€‰æ‹©ä¸€ä¸ªåˆé€‚çš„è¿ç§»ç›®æ ‡CPU(å°æ ¸)
+/*  Îª(´óºËÉÏ)¸ºÔØ×îÇáµÄ½ø³Ìµ÷¶ÈÊµÌå se Ñ¡ÔñÒ»¸öºÏÊÊµÄÇ¨ÒÆÄ¿±êCPU(Ğ¡ºË)
  *
  *
- *  è°ƒç”¨å…³ç³»
+ *  µ÷ÓÃ¹ØÏµ
  *      run_rebalance_domains( )
  *          ->  hmp_force_up_migration( )
  *              ->  hmp_offload_down( )
@@ -5238,36 +5238,36 @@ static inline unsigned int hmp_offload_down(int cpu, struct sched_entity *se)
         int min_usage;
         int dest_cpu = NR_CPUS;
 
-        if (hmp_cpu_is_slowest(cpu))    /*  å¦‚æœå½“å‰CPUå°±æ˜¯ä¸€ä¸ªå°æ ¸, åˆ™æ— éœ€è¿ç§», */
+        if (hmp_cpu_is_slowest(cpu))    /*  Èç¹ûµ±Ç°CPU¾ÍÊÇÒ»¸öĞ¡ºË, ÔòÎŞĞèÇ¨ÒÆ, */
                 return NR_CPUS;
 
         /* Is there an idle CPU in the current domain
-     * æŸ¥æ‰¾å½“å‰ cpu è°ƒåº¦åŸŸ(å¤§æ ¸)æ˜¯å¦æœ‰ç©ºé—² CPU  */
+     * ²éÕÒµ±Ç° cpu µ÷¶ÈÓò(´óºË)ÊÇ·ñÓĞ¿ÕÏĞ CPU  */
         min_usage = hmp_domain_min_load(hmp_cpu_domain(cpu), NULL, NULL);
-        if (min_usage == 0) {           /*  å¦‚æœå¤§æ ¸ä¸­æœ‰ç©ºé—²çš„ CPU, åˆ™ä¹Ÿä¸åšè¿ç§»    */
+        if (min_usage == 0) {           /*  Èç¹û´óºËÖĞÓĞ¿ÕÏĞµÄ CPU, ÔòÒ²²»×öÇ¨ÒÆ    */
                 trace_sched_hmp_offload_abort(cpu, min_usage, "load");
                 return NR_CPUS;
         }
 
         /* Is the task alone on the cpu? */
-        if (cpu_rq(cpu)->cfs.h_nr_running < 2) {    /*  å¦‚æœè¯¥ CPU çš„è¿è¡Œé˜Ÿåˆ—ä¸­æ­£åœ¨è¿è¡Œçš„è¿›ç¨‹åªæœ‰ä¸€ä¸ªæˆ–è€…æ²¡æœ‰, é‚£ä¹ˆä¹Ÿä¸éœ€è¦è¿ç§» */
+        if (cpu_rq(cpu)->cfs.h_nr_running < 2) {    /*  Èç¹û¸Ã CPU µÄÔËĞĞ¶ÓÁĞÖĞÕıÔÚÔËĞĞµÄ½ø³ÌÖ»ÓĞÒ»¸ö»òÕßÃ»ÓĞ, ÄÇÃ´Ò²²»ĞèÒªÇ¨ÒÆ */
                 trace_sched_hmp_offload_abort(cpu,
                         cpu_rq(cpu)->cfs.h_nr_running, "nr_running");
                 return NR_CPUS;
         }
 
-        /* Is the task actually starving? åˆ¤æ–­å½“å‰è¿›ç¨‹æ˜¯å¦é¥¥é¥¿  */
+        /* Is the task actually starving? ÅĞ¶Ïµ±Ç°½ø³ÌÊÇ·ñ¼¢¶ö  */
         /* >=25% ratio running/runnable = starving */
-        if (hmp_task_starvation(se) > 768) {    /*  å½“starving > 75% æ—¶è¯´æ˜è¯¥è¿›ç¨‹ä¸€ç›´æ¸´æœ›è·å¾—æ›´å¤šçš„ CPU æ—¶é—´, è¿™æ ·çš„è¿›ç¨‹ä¹Ÿä¸é€‚åˆè¿ç§»    */
+        if (hmp_task_starvation(se) > 768) {    /*  µ±starving > 75% Ê±ËµÃ÷¸Ã½ø³ÌÒ»Ö±¿ÊÍû»ñµÃ¸ü¶àµÄ CPU Ê±¼ä, ÕâÑùµÄ½ø³ÌÒ²²»ÊÊºÏÇ¨ÒÆ    */
                 trace_sched_hmp_offload_abort(cpu, hmp_task_starvation(se),
                         "starvation");
                 return NR_CPUS;
         }
 
         /* Does the slower domain have any idle CPUs?
-     * æ£€æŸ¥å°æ ¸çš„è°ƒåº¦åŸŸä¸­æ˜¯å¦æœ‰ç©ºé—²çš„CPU
-     * å¦‚æœæœ‰çš„è¯è¿”å›è¯¥ç©ºé—² CPU,
-     * å¦‚æœæ²¡æœ‰çš„è¯è¿”å› NR_CPUS, è¯´æ˜æ²¡æ‰¾åˆ°åˆé€‚çš„CPUç”¨åšè¿ç§»çš„ç›®çš„åœ°
+     * ¼ì²éĞ¡ºËµÄµ÷¶ÈÓòÖĞÊÇ·ñÓĞ¿ÕÏĞµÄCPU
+     * Èç¹ûÓĞµÄ»°·µ»Ø¸Ã¿ÕÏĞ CPU,
+     * Èç¹ûÃ»ÓĞµÄ»°·µ»Ø NR_CPUS, ËµÃ÷Ã»ÕÒµ½ºÏÊÊµÄCPUÓÃ×öÇ¨ÒÆµÄÄ¿µÄµØ
      * */
         min_usage = hmp_domain_min_load(hmp_slower_domain(cpu), &dest_cpu,
                         tsk_cpus_allowed(task_of(se)));
@@ -5292,11 +5292,11 @@ static inline unsigned int hmp_offload_down(int cpu, struct sched_entity *se)
  *
  * preempt must be disabled.
  *
- * åœ¨ HMP è°ƒåº¦å™¨ä¸­å¯¹å¾…æ–°åˆ›å»ºçš„è¿›ç¨‹ä¼šæœ‰ç‰¹æ®Šçš„å¤„ç†
+ * ÔÚ HMP µ÷¶ÈÆ÷ÖĞ¶Ô´ıĞÂ´´½¨µÄ½ø³Ì»áÓĞÌØÊâµÄ´¦Àí
  *
- * æ–°åˆ›å»ºçš„è¿›ç¨‹åˆ›å»ºå®Œæˆä¹‹åéœ€è¦æŠŠè¿›ç¨‹æ·»åŠ åˆ°åˆé€‚çš„è¿è¡Œé˜Ÿåˆ—ä¸­,
+ * ĞÂ´´½¨µÄ½ø³Ì´´½¨Íê³ÉÖ®ºóĞèÒª°Ñ½ø³ÌÌí¼Óµ½ºÏÊÊµÄÔËĞĞ¶ÓÁĞÖĞ,
  *
- * è¿™ä¸ªè¿‡ç¨‹ä¸­ä¼šè°ƒç”¨ select_task_rq( ) å‡½æ•°æ¥é€‰æ‹©ä¸€ä¸ªæœ€åˆé€‚æ–°è¿›ç¨‹è¿è¡Œçš„ CPU
+ * Õâ¸ö¹ı³ÌÖĞ»áµ÷ÓÃ select_task_rq( ) º¯ÊıÀ´Ñ¡ÔñÒ»¸ö×îºÏÊÊĞÂ½ø³ÌÔËĞĞµÄ CPU
  *
  */
 static int
@@ -5396,7 +5396,7 @@ select_task_rq_fair(struct task_struct *p, int sd_flag, int wake_flags)
 
 #ifdef CONFIG_SCHED_HMP
         /* always put non-kernel forking tasks on a big domain */
-        if (unlikely(sd_flag & SD_BALANCE_FORK) && hmp_task_should_forkboost(p)) {  /*  å¯¹äºæ–°åˆ›å»ºçš„è¿›ç¨‹å¹¶ä¸”è¯¥è¿›ç¨‹æ˜¯ç”¨æˆ·è¿›ç¨‹    */
+        if (unlikely(sd_flag & SD_BALANCE_FORK) && hmp_task_should_forkboost(p)) {  /*  ¶ÔÓÚĞÂ´´½¨µÄ½ø³Ì²¢ÇÒ¸Ã½ø³ÌÊÇÓÃ»§½ø³Ì    */
                 new_cpu = hmp_select_faster_cpu(p, prev_cpu);
                 if (new_cpu != NR_CPUS) {
                         hmp_next_up_delay(&p->se, new_cpu);
@@ -5841,9 +5841,8 @@ static bool yield_to_task_fair(struct rq *rq, struct task_struct *p, bool preemp
         return true;
 }
 
-
- #define CONFIG_SMP
 #ifdef CONFIG_SMP
+#endif
 /**************************************************
  * Fair scheduling class load-balancing methods.
  *
@@ -8246,11 +8245,11 @@ need_kick:
 static void nohz_idle_balance(int this_cpu, enum cpu_idle_type idle) { }
 #endif  /*      CONFIG_NO_HZ_COMMON     */
 
-//////////////////////////////////
-///      #ifdef  CONFIG_SCHED_HMP
-//////////////////////////////////
 
-#ifdef CONFIG_SCHED_HMP_ENHANCEMENT     /*      &&      defined(CONFIG_SCHED_HMP)       */
+
+#ifdef CONFIG_SCHED_HMP
+
+#ifdef CONFIG_SCHED_HMP_ENHANCEMENT
 
 /*
  * Heterogenous Multi-Processor (HMP) - Declaration and Useful Macro
@@ -8759,6 +8758,318 @@ out:
 }
 
 
+#else /* CONFIG_SCHED_HMP_ENHANCEMENT */
+
+/*  ÅĞ¶Ï½ø³ÌÊµÌå se µÄÆ½¾ù¸ºÔØÊÇ·ñ¸ßÓÚ hmp_up_threshold Õâ¸ö·§Öµ
+ *  hmp_up_threshold Ò²ÊÇÒ»¸ö¹ıÂË×÷ÓÃ
+ *  Ä¿Ç° HMP¸ºÔØ¾ùºâµ÷¶ÈÆ÷ÓĞ¼¸¸ö¸ºÔØ
+ *
+ *  #ifdef CONFIG_SCHED_HMP_PRIO_FILTER
+ *  Ò»¸öÊÇÓÅÏÈ¼¶            hmp_up_prio, ÓÅÏÈ¼¶Öµ¸ßÓÚhmp_up_prio(¼´ÓÅÏÈ¼¶½ÏµÍ)µÄ½ø³ÌÎŞĞè´ÓĞ¡ºËÇ¨ÒÆµ½´óºË
+ *  #endif                  ¸Ã·§ÖµÓÉ CONFIG_SCHED_HMP_PRIO_FILTER ºê¿ªÆô
+ *
+ *  Ò»¸öÊÇ¸ºÔØ              hmp_up_threshold,   Ö»ÓĞ¸ºÔØ¸ßÓÚ hmp_up_threshold µÄ½ø³Ì²ÅĞèÒªÇ¨ÒÆ
+ *
+ *  Ò»¸öÊÇÇ¨ÒÆµÄ¼ä¸ô        hmp_next_up_threshold,  Ö»ÓĞÉÏ´ÎÇ¨ÒÆ¾àÀëµ±Ç°Ê±¼äµÄ¼ä¸ô´óÓÚhmp_next_up_threshold µÄ½ø³Ì²Å¿ÉÒÔ½øĞĞÇ¨ÒÆ
+ *                          ¸Ã·§Öµ±ÜÃâ½ø³Ì±»Ç¨ÒÆÀ´Ç¨ÒÆÈ¥
+ *  */
+static unsigned int hmp_task_eligible_for_up_migration(struct sched_entity *se)
+{
+        /* below hmp_up_threshold, never eligible */
+        if (se->avg.load_avg_ratio < hmp_up_threshold)
+                return 0;
+        return 1;
+}
+
+/* Check if task should migrate to a faster cpu
+ * ¼ì²é cpu ÉÏµÄµ÷¶ÈÊµÌå se ÊÇ·ñĞèÒªÇ¨ÒÆµ½´óºËÉÏ
+ *
+ * µ÷ÓÃ¹ØÏµ
+ * run_rebalance_domains( )
+ *  ->  hmp_force_up_migration( )
+ *      ->  hmp_up_migration( )
+ *
+ * ·µ»ØÖµ
+ *
+ *  Èç¹û se ±¾À´¾ÍÊÇÔÚ´óºËÉÏÔËĞĞ, ÔòÎŞĞè½øĞĞÏòÉÏÇ¨ÒÆ, return 0
+ *
+ *  Èç¹û¿ªÆôÁËCONFIG_SCHED_HMP_PRIO_FILTERºê,
+ *  ¶øse->prio > hmp_up_prio, ¼´ se µÄÓÅÏÈ¼¶¹ıÓÚµÍ, ²»ÊÊÒËÏòÉÏÇ¨ÒÆ,
+ *  ÕâµãÊÇ·ûºÏÏÖÊµÇé¿öµÄ, µÍÓÅÏÈ¼¶µÄ½ø³ÌÎŞ¹Ø½ôÒª, ÓÃ»§Ò²²»»áÔÚÒâÆä¸ü¿ìµÄÍê³ÉºÍÏìÓ¦,
+ *  ×ÔÈ»Ã»±ØÒªĞèÒªÇ¨ÒÆµ½´óºËÉÏÈ¥»ñµÃ¸ü¸ßµÄĞÔÄÜ, return 0
+ *
+ *  ¸Ã½ø³ÌÉÏÒ»´ÎÇ¨ÒÆÀëÏÖÔÚµÄÊ±¼ä¼ä¸ôĞ¡ÓÚ hmp_next_up_threshold ·§ÖµµÄÒ²²»ĞèÒªÇ¨ÒÆ, ±ÜÃâ±»Ç¨ÒÆÀ´Ç¨ÒÆÈ¥, return 0
+ *
+ *  ÆäËûÇé¿ö, Èç¹û½ø³ÌÂú×ãÏòÉÏÇ¨ÒÆµÄĞèÇó, Ôò´Ó´óºËµÄµ÷¶ÈÓòÖĞÕÒµ½Ò»¸ö¿ÕÏĞµÄCPU
+ * */
+static unsigned int hmp_up_migration(int cpu, int *target_cpu, struct sched_entity *se)
+{
+        struct task_struct *p = task_of(se);
+        int temp_target_cpu;
+        u64 now;
+
+        if (hmp_cpu_is_fastest(cpu))        /*  Ê×ÏÈÅĞ¶Ï se Ô­À´ËùÔËĞĞµÄ cpu ÊÇ·ñÔÚ´óºËµÄµ÷¶ÈÓò  */
+                return 0;                       /*  Èç¹ûÒÑ¾­ÔÚ´óºËµÄµ÷¶ÈÓòÄÚ, ÔòÃ»±ØÒª½øĞĞÇ¨ÒÆ·±Ã¦µÄ½ø³Ì¡¡se µ½´óºË target_cpu ÉÏ   */
+
+#ifdef CONFIG_SCHED_HMP_PRIO_FILTER
+        /* Filter by task priority
+     * hmp_up_prio ÓÃÓÚ¹ıÂËÓÅÏÈ¼¶¸ßÓÚ¸ÃÖµµÄ½ø³Ì,
+     * Èç¹û´ıÇ¨ÒÆ½ø³Ì p ÓÅÏÈ¼¶´óÓÚ hmp_up_prio ,
+     * ÄÇÃ´Ò²Ã»±ØÒªÇ¨ÒÆµ½´óºË CPU ÉÏ
+     *
+     * Õâ¸öÒª´ò¿ª CONFIG_SCHED_HMP_PRIO_FILTER  Õâ¸öºê²ÅÄÜ¿ªÊ¼´Ë¹¦ÄÜ,
+     * ÁíÍâ×¢ÒâÓÅÏÈ¼¶µÄÊıÖµÊÇÔ½µÍÓÅÏÈ¼¶Ô½¸ß,
+     * Òò´Ë´Ë¹¦ÄÜÀàËÆÓÚÈç¹ûÈÎÎñÓÅÏÈ¼¶±È½ÏµÍ,
+     * ¿ÉÒÔÉèÖÃÒ»¸ö·§Öµ hmp_up_prio,
+     * ÓÅÏÈ¼¶µÍÓÚ·§ÖµµÄ½ø³Ì¼´Ê¹ÔÙ·±ÖØÎÒÃÇÒ²²»ĞèÒª¶ÔËû½øĞĞÇ¨ÒÆ,
+     * ´Ó¶ø±£Ö¤¸ßÓÅÏÈ¼¶½øĞĞÓÅÏÈµÃµ½ÏìÓ¦ºÍÇ¨ÒÆ   */
+        if (p->prio >= hmp_up_prio)
+                return 0;
+#endif
+        if (!hmp_task_eligible_for_up_migration(se))    /*  ÅĞ¶Ï¸Ã½ø³ÌÊµÌåseµÄÆ½¾ù¸ºÔØÊÇ·ñ¸ßÓÚ hmp_up_threshold Õâ¸ö·§Öµ   */
+                return 0;
+
+        /* Let the task load settle before doing another up migration */
+        /* hack - always use clock from first online CPU */
+    /*  Ç¨ÒÆÊ±¼äÉÏµÄ¹ıÂË,
+     *  ¸Ã½ø³ÌÉÏÒ»´ÎÇ¨ÒÆÀëÏÖÔÚµÄÊ±¼ä¼ä¸ôĞ¡ÓÚ hmp_next_up_threshold ·§ÖµµÄÒ²²»ĞèÒªÇ¨ÒÆ,
+     *  ´Ó¶ø±ÜÃâ½ø³Ì±»Ç¨ÒÆÀ´Ç¨ÒÆÈ¥  */
+        now = cpu_rq(cpumask_first(cpu_online_mask))->clock_task;
+        if (((now - se->avg.hmp_last_up_migration) >> 10)
+                                        < hmp_next_up_threshold)
+                return 0;
+
+        /* hmp_domain_min_load only returns 0 for an
+         * idle CPU or 1023 for any partly-busy one.
+         * Be explicit about requirement for an idle CPU.
+     *
+     * ²éÕÒ´óºËµ÷¶ÈÓòÖĞÊÇ·ñÓĞ¿ÕÏĞµÄCPU
+         */
+        if (hmp_domain_min_load(hmp_faster_domain(cpu), &temp_target_cpu,
+                        tsk_cpus_allowed(p)) == 0 && temp_target_cpu != NR_CPUS) {  /*  Èç¹ûÔÚ´óºËµ÷¶ÈÓòÖĞÕÒµ½ÁËÒ»¸ö¿ÕÏĞµÄCPU, ¼´target_cpu */
+                if(target_cpu)
+                        *target_cpu = temp_target_cpu;  /*  ÉèÖÃ target_cpu Îª²éÕÒµ½µÄ CPU                              */
+                return 1;                           /*  ·µ»Ø1, ÔÚ´óºËµ÷¶ÈÓòÖĞ·¢ÏÖÁË¿ÕÏĞµÄ CPU, ÓÃ target_cpu ·µ»Ø   */
+        }
+        return 0;
+}
+
+/* Check if task should migrate to a slower cpu
+ * ¼ì²éµ±Ç°½ø³Ìµ÷¶ÈÊµÌåÊÇ·ñ¿ÉÒÔ±»Ç¨ÒÆÖÁÒ»¸öĞ¡ºË
+ * */
+static unsigned int hmp_down_migration(int cpu, struct sched_entity *se)
+{
+        struct task_struct *p = task_of(se);
+        u64 now;
+
+        if (hmp_cpu_is_slowest(cpu)) {          /*  Èç¹ûµ±Ç°µ÷¶ÈÊµÌåËùÔÚµÄ CPU ÒÑ¾­ÊÇĞ¡ºË       */
+#ifdef CONFIG_SCHED_HMP_LITTLE_PACKING      /*  Ğ¡ÈÎÎñ·â°ü²¹¶¡, ÔËĞĞĞ¡ÈÎÎñÔÚĞ¡ºËÖ®¼äÇ¨ÒÆ    */
+                if(hmp_packing_enabled)
+                        return 1;
+                else
+#endif
+                return 0;
+        }
+
+#ifdef CONFIG_SCHED_HMP_PRIO_FILTER
+        /* Filter by task priority */
+        if ((p->prio >= hmp_up_prio) &&
+                cpumask_intersects(&hmp_slower_domain(cpu)->cpus,
+                                        tsk_cpus_allowed(p))) {
+                return 1;
+        }
+#endif
+
+        /* Let the task load settle before doing another down migration */
+        /* hack - always use clock from first online CPU */
+        now = cpu_rq(cpumask_first(cpu_online_mask))->clock_task;
+        if (((now - se->avg.hmp_last_down_migration) >> 10)
+                                        < hmp_next_down_threshold)
+                return 0;
+
+        if (cpumask_intersects(&hmp_slower_domain(cpu)->cpus,
+                                        tsk_cpus_allowed(p))
+                && se->avg.load_avg_ratio < hmp_down_threshold) {
+                return 1;
+        }
+        return 0;
+}
+
+/*
+ * hmp_can_migrate_task - may task p from runqueue rq be migrated to this_cpu?
+ * Ideally this function should be merged with can_migrate_task() to avoid
+ * redundant code.
+ */
+static int hmp_can_migrate_task(struct task_struct *p, struct lb_env *env)
+{
+        int tsk_cache_hot = 0;
+
+        /*
+         * We do not migrate tasks that are:
+         * 1) running (obviously), or
+         * 2) cannot be migrated to this CPU due to cpus_allowed
+         */
+        if (!cpumask_test_cpu(env->dst_cpu, tsk_cpus_allowed(p))) {
+                schedstat_inc(p, se.statistics.nr_failed_migrations_affine);
+                return 0;
+        }
+        env->flags &= ~LBF_ALL_PINNED;
+
+        if (task_running(env->src_rq, p)) {
+                schedstat_inc(p, se.statistics.nr_failed_migrations_running);
+                return 0;
+        }
+
+        /*
+         * Aggressive migration if:
+         * 1) task is cache cold, or
+         * 2) too many balance attempts have failed.
+         */
+
+#if defined(CONFIG_MT_LOAD_BALANCE_ENHANCEMENT)
+        tsk_cache_hot = task_hot(p, env->src_rq->clock_task, env->sd, env->mt_check_cache_in_idle);
+#else
+        tsk_cache_hot = task_hot(p, env->src_rq->clock_task, env->sd);
+#endif
+        if (!tsk_cache_hot ||
+                env->sd->nr_balance_failed > env->sd->cache_nice_tries) {
+#ifdef CONFIG_SCHEDSTATS
+                if (tsk_cache_hot) {
+                        schedstat_inc(env->sd, lb_hot_gained[env->idle]);
+                        schedstat_inc(p, se.statistics.nr_forced_migrations);
+                }
+#endif
+                return 1;
+        }
+
+        return 1;
+}
+
+/*
+ * move_specific_task tries to move a specific task.
+ * Returns 1 if successful and 0 otherwise.
+ * Called with both runqueues locked.
+ */
+static int move_specific_task(struct lb_env *env, struct task_struct *pm)
+{
+        struct task_struct *p, *n;
+
+        list_for_each_entry_safe(p, n, &env->src_rq->cfs_tasks, se.group_node) {
+        if (throttled_lb_pair(task_group(p), env->src_rq->cpu,
+                                env->dst_cpu))
+                continue;
+
+                if (!hmp_can_migrate_task(p, env))
+                        continue;
+                /* Check if we found the right task */
+                if (p != pm)
+                        continue;
+
+                move_task(p, env);
+                /*
+                 * Right now, this is only the third place move_task()
+                 * is called, so we can safely collect move_task()
+                 * stats here rather than inside move_task().
+                 */
+                schedstat_inc(env->sd, lb_gained[env->idle]);
+                return 1;
+        }
+        return 0;
+}
+
+/*
+ * hmp_active_task_migration_cpu_stop is run by cpu stopper and used to
+ * migrate a specific task from one runqueue to another.
+ * hmp_force_up_migration uses this to push a currently running task
+ * off a runqueue. hmp_idle_pull uses this to pull a currently
+ * running task to an idle runqueue.
+ * Reuses __do_active_load_balance_cpu_stop to actually do the work.
+ */
+static int hmp_active_task_migration_cpu_stop(void *data)
+{
+        return __do_active_load_balance_cpu_stop(data, false);
+}
+
+/*
+ * Move task in a runnable state to another CPU.
+ *
+ * Tailored on 'active_load_balance_cpu_stop' with slight
+ * modification to locking and pre-transfer checks.  Note
+ * rq->lock must be held before calling.
+ *
+ * Ç¨ÒÆÔ´ CPU ÊÇ for Ñ­»·±éÀúµ½µÄ CPU,  cpu_of(rq)
+ * Ç¨ÒÆ½ø³ÌÊÇÖ®Ç°ÕÒµ½µÄÄÇ¸ö¸ºÔØ±È½ÏÇáµÄ½ø³Ì,    rq->migrate_task
+ * Ç¨ÒÆÄ¿µÄµØ CPU ÊÇÔÚĞ¡ºËµ÷¶ÈÓòÖĞÕÒµ½µÄ¿ÕÏĞ CPU,   rq->push_cpu
+ *
+ * µ÷ÓÃ¹ØÏµ
+ * run_rebalance_domains( )
+ *  ->  hmp_force_up_migration( )
+ *      ->  hmp_migrate_runnable_task( )
+ */
+static void hmp_migrate_runnable_task(struct rq *rq)
+{
+        struct sched_domain *sd;
+        int src_cpu = cpu_of(rq);                   /*  Ç¨ÒÆµÄÔ´cpu     */
+        struct rq *src_rq = rq;
+        int dst_cpu = rq->push_cpu;                 /*  Ç¨ÒÆµÄÄ¿µÄcpu   */
+        struct rq *dst_rq = cpu_rq(dst_cpu);
+        struct task_struct *p = rq->migrate_task;
+        /*
+         * One last check to make sure nobody else is playing
+         * with the source rq.
+         */
+        if (src_rq->active_balance)
+                goto out;
+
+        if (src_rq->nr_running <= 1)    /*  Ô´ CPU µÄÔËĞĞ¶ÓÁĞÉÏµÄÈÎÎñÊıÄ¿ <= 1, Ôò²»Ó¦¸ÃÇ¨ÒÆ    */
+                goto out;
+
+        if (task_rq(p) != src_rq)       /*  Èç¹û´ıÇ¨ÒÆ½ø³Ì p ²¢²»ÔÚÔ´ CPU (µÄÈÎÎñ¶ÓÁĞ)ÉÏ, ÔòÒ²²»ÄÜÇ¨ÒÆ    */
+                goto out;
+        /*
+         * Not sure if this applies here but one can never
+         * be too cautious
+         */
+        BUG_ON(src_rq == dst_rq);
+
+        double_lock_balance(src_rq, dst_rq);        /*  ¶ÔÔ´Ç¨ÒÆÈÎÎñ¶ÓÁĞsrc_rq ºÍ Ä¿µÄÈÎÎñ dst_rq ¼ÓËø  */
+
+        rcu_read_lock();
+        for_each_domain(dst_cpu, sd) {
+                if (cpumask_test_cpu(src_cpu, sched_domain_span(sd)))
+                        break;
+        }
+    /*  ÕâÀïºÍÄÚºËÄ¬ÈÏµÄ¸ºÔØ¾ùºâµ÷¶ÈÆ÷µÄ load_balance( ) º¯ÊıÒ»ÑùÊ¹ÓÃ struct lb_env ½á¹¹ÌåÀ´ÃèÊöÇ¨ÒÆĞÅÏ¢
+     *  Ç¨ÒÆµÄ¶¯×÷ÊÇ move_specific_task()º¯Êı
+     *
+     *  move_specific_task( ) º¯ÊıµÄÊµÏÖºÍ load_balance( )º¯ÊıÀïÊµÏÖµÄÀàËÆ  */
+        if (likely(sd)) {
+                struct lb_env env = {
+                        .sd             = sd,
+                        .dst_cpu        = dst_cpu,
+                        .dst_rq         = dst_rq,
+                        .src_cpu        = src_cpu,
+                        .src_rq         = src_rq,
+                        .idle           = CPU_IDLE,
+                };
+
+                schedstat_inc(sd, alb_count);
+
+                if (move_specific_task(&env, p))
+                        schedstat_inc(sd, alb_pushed);
+                else
+                        schedstat_inc(sd, alb_failed);
+        }
+
+        rcu_read_unlock();
+        double_unlock_balance(src_rq, dst_rq);
+out:
+        put_task_struct(p);
+}
+
+static DEFINE_SPINLOCK(hmp_force_migration);
+
+#ifdef CONFIG_SCHED_HMP_ENHANCEMENT
 
 
 /*
@@ -8981,323 +9292,14 @@ out_force_up:
 }
 
 
+#elif defined(CONFIG_SCHED_HMP) /* CONFIG_SCHED_HMP_ENHANCEMENT */
 
-#elif   defined(CONFIG_SCHED_HMP)   /*  && !defined(CONFIG_SCHED_HMP__ENHANCEMENT)
-
-/*  åˆ¤æ–­è¿›ç¨‹å®ä½“ se çš„å¹³å‡è´Ÿè½½æ˜¯å¦é«˜äº hmp_up_threshold è¿™ä¸ªé˜€å€¼
- *  hmp_up_threshold ä¹Ÿæ˜¯ä¸€ä¸ªè¿‡æ»¤ä½œç”¨
- *  ç›®å‰ HMPè´Ÿè½½å‡è¡¡è°ƒåº¦å™¨æœ‰å‡ ä¸ªè´Ÿè½½
- *
- *  #ifdef CONFIG_SCHED_HMP_PRIO_FILTER
- *  ä¸€ä¸ªæ˜¯ä¼˜å…ˆçº§            hmp_up_prio, ä¼˜å…ˆçº§å€¼é«˜äºhmp_up_prio(å³ä¼˜å…ˆçº§è¾ƒä½)çš„è¿›ç¨‹æ— éœ€ä»å°æ ¸è¿ç§»åˆ°å¤§æ ¸
- *  #endif                  è¯¥é˜€å€¼ç”± CONFIG_SCHED_HMP_PRIO_FILTER å®å¼€å¯
- *
- *  ä¸€ä¸ªæ˜¯è´Ÿè½½              hmp_up_threshold,   åªæœ‰è´Ÿè½½é«˜äº hmp_up_threshold çš„è¿›ç¨‹æ‰éœ€è¦è¿ç§»
- *
- *  ä¸€ä¸ªæ˜¯è¿ç§»çš„é—´éš”        hmp_next_up_threshold,  åªæœ‰ä¸Šæ¬¡è¿ç§»è·ç¦»å½“å‰æ—¶é—´çš„é—´éš”å¤§äºhmp_next_up_threshold çš„è¿›ç¨‹æ‰å¯ä»¥è¿›è¡Œè¿ç§»
- *                          è¯¥é˜€å€¼é¿å…è¿›ç¨‹è¢«è¿ç§»æ¥è¿ç§»å»
- *  */
-static unsigned int hmp_task_eligible_for_up_migration(struct sched_entity *se)
-{
-        /* below hmp_up_threshold, never eligible */
-        if (se->avg.load_avg_ratio < hmp_up_threshold)
-                return 0;
-        return 1;
-}
-
-/* Check if task should migrate to a faster cpu
- * æ£€æŸ¥ cpu ä¸Šçš„è°ƒåº¦å®ä½“ se æ˜¯å¦éœ€è¦è¿ç§»åˆ°å¤§æ ¸ä¸Š
- *
- * è°ƒç”¨å…³ç³»
- * run_rebalance_domains( )
- *  ->  hmp_force_up_migration( )
- *      ->  hmp_up_migration( )
- *
- * è¿”å›å€¼
- *
- *  å¦‚æœ se æœ¬æ¥å°±æ˜¯åœ¨å¤§æ ¸ä¸Šè¿è¡Œ, åˆ™æ— éœ€è¿›è¡Œå‘ä¸Šè¿ç§», return 0
- *
- *  å¦‚æœå¼€å¯äº†CONFIG_SCHED_HMP_PRIO_FILTERå®,
- *  è€Œse->prio > hmp_up_prio, å³ se çš„ä¼˜å…ˆçº§è¿‡äºä½, ä¸é€‚å®œå‘ä¸Šè¿ç§»,
- *  è¿™ç‚¹æ˜¯ç¬¦åˆç°å®æƒ…å†µçš„, ä½ä¼˜å…ˆçº§çš„è¿›ç¨‹æ— å…³ç´§è¦, ç”¨æˆ·ä¹Ÿä¸ä¼šåœ¨æ„å…¶æ›´å¿«çš„å®Œæˆå’Œå“åº”,
- *  è‡ªç„¶æ²¡å¿…è¦éœ€è¦è¿ç§»åˆ°å¤§æ ¸ä¸Šå»è·å¾—æ›´é«˜çš„æ€§èƒ½, return 0
- *
- *  è¯¥è¿›ç¨‹ä¸Šä¸€æ¬¡è¿ç§»ç¦»ç°åœ¨çš„æ—¶é—´é—´éš”å°äº hmp_next_up_threshold é˜€å€¼çš„ä¹Ÿä¸éœ€è¦è¿ç§», é¿å…è¢«è¿ç§»æ¥è¿ç§»å», return 0
- *
- *  å…¶ä»–æƒ…å†µ, å¦‚æœè¿›ç¨‹æ»¡è¶³å‘ä¸Šè¿ç§»çš„éœ€æ±‚, åˆ™ä»å¤§æ ¸çš„è°ƒåº¦åŸŸä¸­æ‰¾åˆ°ä¸€ä¸ªç©ºé—²çš„CPU
- * */
-static unsigned int hmp_up_migration(int cpu, int *target_cpu, struct sched_entity *se)
-{
-        struct task_struct *p = task_of(se);
-        int temp_target_cpu;
-        u64 now;
-
-        if (hmp_cpu_is_fastest(cpu))        /*  é¦–å…ˆåˆ¤æ–­ se åŸæ¥æ‰€è¿è¡Œçš„ cpu æ˜¯å¦åœ¨å¤§æ ¸çš„è°ƒåº¦åŸŸ  */
-                return 0;                       /*  å¦‚æœå·²ç»åœ¨å¤§æ ¸çš„è°ƒåº¦åŸŸå†…, åˆ™æ²¡å¿…è¦è¿›è¡Œè¿ç§»ç¹å¿™çš„è¿›ç¨‹ã€€se åˆ°å¤§æ ¸ target_cpu ä¸Š   */
-
-#ifdef CONFIG_SCHED_HMP_PRIO_FILTER
-        /* Filter by task priority
-     * hmp_up_prio ç”¨äºè¿‡æ»¤ä¼˜å…ˆçº§é«˜äºè¯¥å€¼çš„è¿›ç¨‹,
-     * å¦‚æœå¾…è¿ç§»è¿›ç¨‹ p ä¼˜å…ˆçº§å¤§äº hmp_up_prio ,
-     * é‚£ä¹ˆä¹Ÿæ²¡å¿…è¦è¿ç§»åˆ°å¤§æ ¸ CPU ä¸Š
-     *
-     * è¿™ä¸ªè¦æ‰“å¼€ CONFIG_SCHED_HMP_PRIO_FILTER  è¿™ä¸ªå®æ‰èƒ½å¼€å§‹æ­¤åŠŸèƒ½,
-     * å¦å¤–æ³¨æ„ä¼˜å…ˆçº§çš„æ•°å€¼æ˜¯è¶Šä½ä¼˜å…ˆçº§è¶Šé«˜,
-     * å› æ­¤æ­¤åŠŸèƒ½ç±»ä¼¼äºå¦‚æœä»»åŠ¡ä¼˜å…ˆçº§æ¯”è¾ƒä½,
-     * å¯ä»¥è®¾ç½®ä¸€ä¸ªé˜€å€¼ hmp_up_prio,
-     * ä¼˜å…ˆçº§ä½äºé˜€å€¼çš„è¿›ç¨‹å³ä½¿å†ç¹é‡æˆ‘ä»¬ä¹Ÿä¸éœ€è¦å¯¹ä»–è¿›è¡Œè¿ç§»,
-     * ä»è€Œä¿è¯é«˜ä¼˜å…ˆçº§è¿›è¡Œä¼˜å…ˆå¾—åˆ°å“åº”å’Œè¿ç§»   */
-        if (p->prio >= hmp_up_prio)
-                return 0;
-#endif
-        if (!hmp_task_eligible_for_up_migration(se))    /*  åˆ¤æ–­è¯¥è¿›ç¨‹å®ä½“seçš„å¹³å‡è´Ÿè½½æ˜¯å¦é«˜äº hmp_up_threshold è¿™ä¸ªé˜€å€¼   */
-                return 0;
-
-        /* Let the task load settle before doing another up migration */
-        /* hack - always use clock from first online CPU */
-    /*  è¿ç§»æ—¶é—´ä¸Šçš„è¿‡æ»¤,
-     *  è¯¥è¿›ç¨‹ä¸Šä¸€æ¬¡è¿ç§»ç¦»ç°åœ¨çš„æ—¶é—´é—´éš”å°äº hmp_next_up_threshold é˜€å€¼çš„ä¹Ÿä¸éœ€è¦è¿ç§»,
-     *  ä»è€Œé¿å…è¿›ç¨‹è¢«è¿ç§»æ¥è¿ç§»å»  */
-        now = cpu_rq(cpumask_first(cpu_online_mask))->clock_task;
-        if (((now - se->avg.hmp_last_up_migration) >> 10)
-                                        < hmp_next_up_threshold)
-                return 0;
-
-        /* hmp_domain_min_load only returns 0 for an
-         * idle CPU or 1023 for any partly-busy one.
-         * Be explicit about requirement for an idle CPU.
-     *
-     * æŸ¥æ‰¾å¤§æ ¸è°ƒåº¦åŸŸä¸­æ˜¯å¦æœ‰ç©ºé—²çš„CPU
-         */
-        if (hmp_domain_min_load(hmp_faster_domain(cpu), &temp_target_cpu,
-                        tsk_cpus_allowed(p)) == 0 && temp_target_cpu != NR_CPUS) {  /*  å¦‚æœåœ¨å¤§æ ¸è°ƒåº¦åŸŸä¸­æ‰¾åˆ°äº†ä¸€ä¸ªç©ºé—²çš„CPU, å³target_cpu */
-                if(target_cpu)
-                        *target_cpu = temp_target_cpu;  /*  è®¾ç½® target_cpu ä¸ºæŸ¥æ‰¾åˆ°çš„ CPU                              */
-                return 1;                           /*  è¿”å›1, åœ¨å¤§æ ¸è°ƒåº¦åŸŸä¸­å‘ç°äº†ç©ºé—²çš„ CPU, ç”¨ target_cpu è¿”å›   */
-        }
-        return 0;
-}
-
-/* Check if task should migrate to a slower cpu
- * æ£€æŸ¥å½“å‰è¿›ç¨‹è°ƒåº¦å®ä½“æ˜¯å¦å¯ä»¥è¢«è¿ç§»è‡³ä¸€ä¸ªå°æ ¸
- * */
-static unsigned int hmp_down_migration(int cpu, struct sched_entity *se)
-{
-        struct task_struct *p = task_of(se);
-        u64 now;
-
-        if (hmp_cpu_is_slowest(cpu)) {          /*  å¦‚æœå½“å‰è°ƒåº¦å®ä½“æ‰€åœ¨çš„ CPU å·²ç»æ˜¯å°æ ¸       */
-#ifdef CONFIG_SCHED_HMP_LITTLE_PACKING      /*  å°ä»»åŠ¡å°åŒ…è¡¥ä¸, è¿è¡Œå°ä»»åŠ¡åœ¨å°æ ¸ä¹‹é—´è¿ç§»    */
-                if(hmp_packing_enabled)
-                        return 1;
-                else
-#endif
-                return 0;
-        }
-
-#ifdef CONFIG_SCHED_HMP_PRIO_FILTER
-        /* Filter by task priority */
-        if ((p->prio >= hmp_up_prio) &&
-                cpumask_intersects(&hmp_slower_domain(cpu)->cpus,
-                                        tsk_cpus_allowed(p))) {
-                return 1;
-        }
-#endif
-
-        /* Let the task load settle before doing another down migration */
-        /* hack - always use clock from first online CPU */
-        now = cpu_rq(cpumask_first(cpu_online_mask))->clock_task;
-        if (((now - se->avg.hmp_last_down_migration) >> 10)
-                                        < hmp_next_down_threshold)
-                return 0;
-
-        if (cpumask_intersects(&hmp_slower_domain(cpu)->cpus,
-                                        tsk_cpus_allowed(p))
-                && se->avg.load_avg_ratio < hmp_down_threshold) {
-                return 1;
-        }
-        return 0;
-}
-
-/*
- * hmp_can_migrate_task - may task p from runqueue rq be migrated to this_cpu?
- * Ideally this function should be merged with can_migrate_task() to avoid
- * redundant code.
- */
-static int hmp_can_migrate_task(struct task_struct *p, struct lb_env *env)
-{
-        int tsk_cache_hot = 0;
-
-        /*
-         * We do not migrate tasks that are:
-         * 1) running (obviously), or
-         * 2) cannot be migrated to this CPU due to cpus_allowed
-         */
-        if (!cpumask_test_cpu(env->dst_cpu, tsk_cpus_allowed(p))) {
-                schedstat_inc(p, se.statistics.nr_failed_migrations_affine);
-                return 0;
-        }
-        env->flags &= ~LBF_ALL_PINNED;
-
-        if (task_running(env->src_rq, p)) {
-                schedstat_inc(p, se.statistics.nr_failed_migrations_running);
-                return 0;
-        }
-
-        /*
-         * Aggressive migration if:
-         * 1) task is cache cold, or
-         * 2) too many balance attempts have failed.
-         */
-
-#if defined(CONFIG_MT_LOAD_BALANCE_ENHANCEMENT)
-        tsk_cache_hot = task_hot(p, env->src_rq->clock_task, env->sd, env->mt_check_cache_in_idle);
-#else
-        tsk_cache_hot = task_hot(p, env->src_rq->clock_task, env->sd);
-#endif
-        if (!tsk_cache_hot ||
-                env->sd->nr_balance_failed > env->sd->cache_nice_tries) {
-#ifdef CONFIG_SCHEDSTATS
-                if (tsk_cache_hot) {
-                        schedstat_inc(env->sd, lb_hot_gained[env->idle]);
-                        schedstat_inc(p, se.statistics.nr_forced_migrations);
-                }
-#endif
-                return 1;
-        }
-
-        return 1;
-}
-
-/*
- * move_specific_task tries to move a specific task.
- * Returns 1 if successful and 0 otherwise.
- * Called with both runqueues locked.
- */
-static int move_specific_task(struct lb_env *env, struct task_struct *pm)
-{
-        struct task_struct *p, *n;
-
-        list_for_each_entry_safe(p, n, &env->src_rq->cfs_tasks, se.group_node) {
-        if (throttled_lb_pair(task_group(p), env->src_rq->cpu,
-                                env->dst_cpu))
-                continue;
-
-                if (!hmp_can_migrate_task(p, env))
-                        continue;
-                /* Check if we found the right task */
-                if (p != pm)
-                        continue;
-
-                move_task(p, env);
-                /*
-                 * Right now, this is only the third place move_task()
-                 * is called, so we can safely collect move_task()
-                 * stats here rather than inside move_task().
-                 */
-                schedstat_inc(env->sd, lb_gained[env->idle]);
-                return 1;
-        }
-        return 0;
-}
-
-/*
- * hmp_active_task_migration_cpu_stop is run by cpu stopper and used to
- * migrate a specific task from one runqueue to another.
- * hmp_force_up_migration uses this to push a currently running task
- * off a runqueue. hmp_idle_pull uses this to pull a currently
- * running task to an idle runqueue.
- * Reuses __do_active_load_balance_cpu_stop to actually do the work.
- */
-static int hmp_active_task_migration_cpu_stop(void *data)
-{
-        return __do_active_load_balance_cpu_stop(data, false);
-}
-
-/*
- * Move task in a runnable state to another CPU.
- *
- * Tailored on 'active_load_balance_cpu_stop' with slight
- * modification to locking and pre-transfer checks.  Note
- * rq->lock must be held before calling.
- *
- * è¿ç§»æº CPU æ˜¯ for å¾ªç¯éå†åˆ°çš„ CPU,  cpu_of(rq)
- * è¿ç§»è¿›ç¨‹æ˜¯ä¹‹å‰æ‰¾åˆ°çš„é‚£ä¸ªè´Ÿè½½æ¯”è¾ƒè½»çš„è¿›ç¨‹,    rq->migrate_task
- * è¿ç§»ç›®çš„åœ° CPU æ˜¯åœ¨å°æ ¸è°ƒåº¦åŸŸä¸­æ‰¾åˆ°çš„ç©ºé—² CPU,   rq->push_cpu
- *
- * è°ƒç”¨å…³ç³»
- * run_rebalance_domains( )
- *  ->  hmp_force_up_migration( )
- *      ->  hmp_migrate_runnable_task( )
- */
-static void hmp_migrate_runnable_task(struct rq *rq)
-{
-        struct sched_domain *sd;
-        int src_cpu = cpu_of(rq);                   /*  è¿ç§»çš„æºcpu     */
-        struct rq *src_rq = rq;
-        int dst_cpu = rq->push_cpu;                 /*  è¿ç§»çš„ç›®çš„cpu   */
-        struct rq *dst_rq = cpu_rq(dst_cpu);
-        struct task_struct *p = rq->migrate_task;
-        /*
-         * One last check to make sure nobody else is playing
-         * with the source rq.
-         */
-        if (src_rq->active_balance)
-                goto out;
-
-        if (src_rq->nr_running <= 1)    /*  æº CPU çš„è¿è¡Œé˜Ÿåˆ—ä¸Šçš„ä»»åŠ¡æ•°ç›® <= 1, åˆ™ä¸åº”è¯¥è¿ç§»    */
-                goto out;
-
-        if (task_rq(p) != src_rq)       /*  å¦‚æœå¾…è¿ç§»è¿›ç¨‹ p å¹¶ä¸åœ¨æº CPU (çš„ä»»åŠ¡é˜Ÿåˆ—)ä¸Š, åˆ™ä¹Ÿä¸èƒ½è¿ç§»    */
-                goto out;
-        /*
-         * Not sure if this applies here but one can never
-         * be too cautious
-         */
-        BUG_ON(src_rq == dst_rq);
-
-        double_lock_balance(src_rq, dst_rq);        /*  å¯¹æºè¿ç§»ä»»åŠ¡é˜Ÿåˆ—src_rq å’Œ ç›®çš„ä»»åŠ¡ dst_rq åŠ é”  */
-
-        rcu_read_lock();
-        for_each_domain(dst_cpu, sd) {
-                if (cpumask_test_cpu(src_cpu, sched_domain_span(sd)))
-                        break;
-        }
-    /*  è¿™é‡Œå’Œå†…æ ¸é»˜è®¤çš„è´Ÿè½½å‡è¡¡è°ƒåº¦å™¨çš„ load_balance( ) å‡½æ•°ä¸€æ ·ä½¿ç”¨ struct lb_env ç»“æ„ä½“æ¥æè¿°è¿ç§»ä¿¡æ¯
-     *  è¿ç§»çš„åŠ¨ä½œæ˜¯ move_specific_task()å‡½æ•°
-     *
-     *  move_specific_task( ) å‡½æ•°çš„å®ç°å’Œ load_balance( )å‡½æ•°é‡Œå®ç°çš„ç±»ä¼¼  */
-        if (likely(sd)) {
-                struct lb_env env = {
-                        .sd             = sd,
-                        .dst_cpu        = dst_cpu,
-                        .dst_rq         = dst_rq,
-                        .src_cpu        = src_cpu,
-                        .src_rq         = src_rq,
-                        .idle           = CPU_IDLE,
-                };
-
-                schedstat_inc(sd, alb_count);
-
-                if (move_specific_task(&env, p))
-                        schedstat_inc(sd, alb_pushed);
-                else
-                        schedstat_inc(sd, alb_failed);
-        }
-
-        rcu_read_unlock();
-        double_unlock_balance(src_rq, dst_rq);
-out:
-        put_task_struct(p);
-}
-
-static DEFINE_SPINLOCK(hmp_force_migration);
 
 /*
  * hmp_force_up_migration checks runqueues for tasks that need to
  * be actively migrated to a faster cpu.
  *
- * è°ƒç”¨å…³ç³»
+ * µ÷ÓÃ¹ØÏµ
  * run_rebalance_domains( )
  *  ->  hmp_force_up_migration( )
  */
@@ -9310,21 +9312,21 @@ static void hmp_force_up_migration(int this_cpu)
         unsigned int force, got_target;
         struct task_struct *p;
 
-    /*  hmp_force_migration æ˜¯ä¸€ä¸ª HMP å®šä¹‰çš„é”  */
+    /*  hmp_force_migration ÊÇÒ»¸ö HMP ¶¨ÒåµÄËø  */
         if (!spin_trylock(&hmp_force_migration))
                 return;
-    /*  ä»å¤´å¼€å§‹éå† æ‰€æœ‰åœ¨çº¿(æ´»è·ƒ)çš„ CPU, ç”±cpu_online_mask æ ‡è¯†   */
+    /*  ´ÓÍ·¿ªÊ¼±éÀú ËùÓĞÔÚÏß(»îÔ¾)µÄ CPU, ÓÉcpu_online_mask ±êÊ¶   */
         for_each_online_cpu(cpu) {
                 force = 0;
                 got_target = 0;
-                target = cpu_rq(cpu);   /*  è·å–åˆ° CPU çš„è¿è¡Œé˜Ÿåˆ—   */
-                raw_spin_lock_irqsave(&target->lock, flags);    /*  å¯¹è¿è¡Œé˜Ÿåˆ—åŠ é”  */
-                curr = target->cfs.curr;    /*  è·å–åˆ° CPU ä¸Šå½“å‰çš„è°ƒåº¦å®ä½“ */
-                if (!curr || target->active_balance) {  /*  å¦‚æœå½“å‰CPUä¸Šæ­£åœ¨åšè´Ÿè½½å‡è¡¡, åˆ™è·³è¿‡è¯¥CPU    */
+                target = cpu_rq(cpu);   /*  »ñÈ¡µ½ CPU µÄÔËĞĞ¶ÓÁĞ   */
+                raw_spin_lock_irqsave(&target->lock, flags);    /*  ¶ÔÔËĞĞ¶ÓÁĞ¼ÓËø  */
+                curr = target->cfs.curr;    /*  »ñÈ¡µ½ CPU ÉÏµ±Ç°µÄµ÷¶ÈÊµÌå */
+                if (!curr || target->active_balance) {  /*  Èç¹ûµ±Ç°CPUÉÏÕıÔÚ×ö¸ºÔØ¾ùºâ, ÔòÌø¹ı¸ÃCPU    */
                         raw_spin_unlock_irqrestore(&target->lock, flags);
                         continue;
                 }
-                if (!entity_is_task(curr)) {    /*  å¦‚æœå½“å‰è¿è¡Œçš„è°ƒåº¦å®ä½“ä¸æ˜¯è¿›ç¨‹, è€Œæ˜¯ä¸€ä¸ªè¿›ç¨‹ç»„, åˆ™ä»ä¸­å–å‡ºæ­£åœ¨è¿è¡Œçš„è¿›, è€Œæ˜¯ä¸€ä¸ªè¿›ç¨‹ç»„, åˆ™ä»ä¸­å–å‡ºæ­£åœ¨è¿è¡Œçš„è¿›ç¨‹ç¨‹  */
+                if (!entity_is_task(curr)) {    /*  Èç¹ûµ±Ç°ÔËĞĞµÄµ÷¶ÈÊµÌå²»ÊÇ½ø³Ì, ¶øÊÇÒ»¸ö½ø³Ì×é, Ôò´ÓÖĞÈ¡³öÕıÔÚÔËĞĞµÄ½ø, ¶øÊÇÒ»¸ö½ø³Ì×é, Ôò´ÓÖĞÈ¡³öÕıÔÚÔËĞĞµÄ½ø³Ì³Ì  */
                         struct cfs_rq *cfs_rq;
 
                         cfs_rq = group_cfs_rq(curr);
@@ -9333,90 +9335,90 @@ static void hmp_force_up_migration(int this_cpu)
                                 cfs_rq = group_cfs_rq(curr);
                         }
                 }
-        /*  ä»»åŠ¡è¿ç§»åˆ†ä¸ºå‘ä¸Šè¿ç§»å’Œå‘ä¸‹è¿ç§»,
+        /*  ÈÎÎñÇ¨ÒÆ·ÖÎªÏòÉÏÇ¨ÒÆºÍÏòÏÂÇ¨ÒÆ,
          *
-         *  å‘ä¸Šè¿ç§»(hmp_up_migration)      -=> å°†å°æ ¸ä¸Šè´Ÿè½½æœ€å¤§ä¸”ç¬¦åˆè¿ç§»è¦æ±‚çš„è¿›ç¨‹è°ƒåº¦å®ä½“è¿ç§»è‡³ç©ºé—²çš„å¤§æ ¸target_cpu
-         *  å‘ä¸‹è¿ç§»(hmp_down_migration)    -=> å°†å¤§æ ¸ä¸Šè´Ÿè½½æœ€å°ä¸”ç¬¦åˆè¿ç§»è¦æ±‚çš„è¿›ç¨‹è°ƒåº¦å®ä½“è¿ç§»è‡³ç©ºé—²çš„å°æ ¸target_cpu
+         *  ÏòÉÏÇ¨ÒÆ(hmp_up_migration)      -=> ½«Ğ¡ºËÉÏ¸ºÔØ×î´óÇÒ·ûºÏÇ¨ÒÆÒªÇóµÄ½ø³Ìµ÷¶ÈÊµÌåÇ¨ÒÆÖÁ¿ÕÏĞµÄ´óºËtarget_cpu
+         *  ÏòÏÂÇ¨ÒÆ(hmp_down_migration)    -=> ½«´óºËÉÏ¸ºÔØ×îĞ¡ÇÒ·ûºÏÇ¨ÒÆÒªÇóµÄ½ø³Ìµ÷¶ÈÊµÌåÇ¨ÒÆÖÁ¿ÕÏĞµÄĞ¡ºËtarget_cpu
          *
-         *  é¦–å…ˆæ£€æŸ¥æ˜¯å¦å¯ä»¥è¿›è¡Œå‘ä¸Šè¿ç§»
+         *  Ê×ÏÈ¼ì²éÊÇ·ñ¿ÉÒÔ½øĞĞÏòÉÏÇ¨ÒÆ
          *
-         *  å¦‚æœå½“å‰éå†åˆ°çš„CPUæ ¸æ˜¯å°æ ¸, åˆ™
-         *      hmp_get_heaviest_task   ä»è¯¥å°æ ¸CPUä¸Šæ‰¾åˆ°ä¸€ä¸ªè´Ÿè½½æœ€å¤§çš„è¿›ç¨‹è°ƒåº¦å®ä½“curr
-         *      hmp_up_migration        åˆ¤æ–­è´Ÿè½½æœ€å¤§çš„è¿›ç¨‹æ˜¯å¦æ»¡è¶³è¿ç§»åˆ°å¤§æ ¸ä¸Šæ‰€éœ€çš„æ¡ä»¶
-         *                              å¦‚æœæ»¡è¶³è¿ç§»çš„è¦æ±‚, è€Œå½“å‰æ‰€æœ‰çš„å¤§æ ¸ä¸­ä¹Ÿæœ‰ç©ºé—²çš„å¤§æ ¸
-         *                              åˆ™è¿”å› 1, å¹¶ç”¨target_cpu æ ‡è®°ç©ºé—²çš„å¤§æ ¸
-         *      ä¸‹é¢é€šçŸ¥å†…æ ¸å¯ä»¥å°†ä»»åŠ¡çš„å‘ä¸Šè¿ç§»
-         *      cpu_rq(target_cpu)->wake_for_idle_pull = 1; è®¾ç½®å°†è¦è¿ç§»çš„ç›®æ ‡ CPU(target_cpu) è¿è¡Œé˜Ÿåˆ—ä¸Šçš„ wake_for_idle_pull æ ‡å¿—ä½
-         *      smp_send_reschedule(target_cpu);            å‘é€ä¸€ä¸ªIPI_RESCHEDULE çš„ IPI ä¸­æ–­ç»™ target_cpu
+         *  Èç¹ûµ±Ç°±éÀúµ½µÄCPUºËÊÇĞ¡ºË, Ôò
+         *      hmp_get_heaviest_task   ´Ó¸ÃĞ¡ºËCPUÉÏÕÒµ½Ò»¸ö¸ºÔØ×î´óµÄ½ø³Ìµ÷¶ÈÊµÌåcurr
+         *      hmp_up_migration        ÅĞ¶Ï¸ºÔØ×î´óµÄ½ø³ÌÊÇ·ñÂú×ãÇ¨ÒÆµ½´óºËÉÏËùĞèµÄÌõ¼ş
+         *                              Èç¹ûÂú×ãÇ¨ÒÆµÄÒªÇó, ¶øµ±Ç°ËùÓĞµÄ´óºËÖĞÒ²ÓĞ¿ÕÏĞµÄ´óºË
+         *                              Ôò·µ»Ø 1, ²¢ÓÃtarget_cpu ±ê¼Ç¿ÕÏĞµÄ´óºË
+         *      ÏÂÃæÍ¨ÖªÄÚºË¿ÉÒÔ½«ÈÎÎñµÄÏòÉÏÇ¨ÒÆ
+         *      cpu_rq(target_cpu)->wake_for_idle_pull = 1; ÉèÖÃ½«ÒªÇ¨ÒÆµÄÄ¿±ê CPU(target_cpu) ÔËĞĞ¶ÓÁĞÉÏµÄ wake_for_idle_pull ±êÖ¾Î»
+         *      smp_send_reschedule(target_cpu);            ·¢ËÍÒ»¸öIPI_RESCHEDULE µÄ IPI ÖĞ¶Ï¸ø target_cpu
          *
          *  */
                 orig = curr;
-                curr = hmp_get_heaviest_task(curr, -1); /*  ä»å½“å‰ CPU(å°æ ¸) ä¸­æ‰¾åˆ°è´Ÿè½½ se->avg.load_avg_ratio æœ€å¤§(å³æœ€ç¹å¿™)çš„é‚£ä¸ªè¿›ç¨‹*/
-                if (!curr) {                            /*  æ²¡æœ‰éœ€è¦è¿ç§»çš„è¿›ç¨‹*/
+                curr = hmp_get_heaviest_task(curr, -1); /*  ´Óµ±Ç° CPU(Ğ¡ºË) ÖĞÕÒµ½¸ºÔØ se->avg.load_avg_ratio ×î´ó(¼´×î·±Ã¦)µÄÄÇ¸ö½ø³Ì*/
+                if (!curr) {                            /*  Ã»ÓĞĞèÒªÇ¨ÒÆµÄ½ø³Ì*/
                         raw_spin_unlock_irqrestore(&target->lock, flags);
                         continue;
                 }
-                p = task_of(curr);                      /*  è·å–åˆ°æ‰¾åˆ°çš„å¤§è´Ÿè½½è¿›è¡Œçš„ task_struct ç»“æ„ */
-                if (hmp_up_migration(cpu, &target_cpu, curr)) {         /*  åˆ¤æ–­åˆšæ‰å–å¾—çš„æœ€å¤§è´Ÿè½½çš„è°ƒåº¦å®ä½“ curr æ˜¯å¦éœ€è¦è¿ç§»åˆ°å¤§æ ¸ CPU ä¸Š, å¦‚æœéœ€è¦åˆ™æ‰¾åˆ°å¤§æ ¸ä¸­ä¸€ä¸ªç©ºé—²çš„ CPU(target_cpu)  */
-                        cpu_rq(target_cpu)->wake_for_idle_pull = 1;         /*  è®¾ç½®å°†è¦è¿ç§»çš„ç›®æ ‡ CPU(target_cpu) è¿è¡Œé˜Ÿåˆ—ä¸Šçš„ wake_for_idle_pull æ ‡å¿—ä½  */
+                p = task_of(curr);                      /*  »ñÈ¡µ½ÕÒµ½µÄ´ó¸ºÔØ½øĞĞµÄ task_struct ½á¹¹ */
+                if (hmp_up_migration(cpu, &target_cpu, curr)) {         /*  ÅĞ¶Ï¸Õ²ÅÈ¡µÃµÄ×î´ó¸ºÔØµÄµ÷¶ÈÊµÌå curr ÊÇ·ñĞèÒªÇ¨ÒÆµ½´óºË CPU ÉÏ, Èç¹ûĞèÒªÔòÕÒµ½´óºËÖĞÒ»¸ö¿ÕÏĞµÄ CPU(target_cpu)  */
+                        cpu_rq(target_cpu)->wake_for_idle_pull = 1;         /*  ÉèÖÃ½«ÒªÇ¨ÒÆµÄÄ¿±ê CPU(target_cpu) ÔËĞĞ¶ÓÁĞÉÏµÄ wake_for_idle_pull ±êÖ¾Î»  */
                         raw_spin_unlock_irqrestore(&target->lock, flags);
                         spin_unlock(&hmp_force_migration);
-                        smp_send_reschedule(target_cpu);                    /*  å‘é€ä¸€ä¸ªIPI_RESCHEDULE çš„ IPI ä¸­æ–­ç»™ target_cpu */
+                        smp_send_reschedule(target_cpu);                    /*  ·¢ËÍÒ»¸öIPI_RESCHEDULE µÄ IPI ÖĞ¶Ï¸ø target_cpu */
                         return;
                 }
-                /*  åˆšæ‰é‚£ä¸ª CPU çœŸæ˜¯å°å¹¸è¿,
-         *      æ­£å¥½å®ƒæ˜¯å°æ ¸ä¸Šçš„ CPU
-         *      å¹¶ä¸”æœ‰åˆé€‚è¿ç§»åˆ°å¤§æ ¸ä¸Šçš„è¿›ç¨‹(è´Ÿè½½å¤§äºé˜€å€¼, ä¸”è¿‘æœŸæœªå‘ç”Ÿè¿ç§», è¿›ç¨‹ä¼˜å…ˆçº§ä¹Ÿæ»¡è¶³é˜€å€¼è¦æ±‚)
-         *      æœ€é‡è¦çš„æ˜¯å¤§æ ¸è°ƒåº¦åŸŸä¸Šæœ‰ç©ºé—²çš„ CPU,
-         *  è¿™å«ä½œæ— å·§ä¸æˆä¹¦.
+                /*  ¸Õ²ÅÄÇ¸ö CPU ÕæÊÇĞ¡ĞÒÔË,
+         *      ÕıºÃËüÊÇĞ¡ºËÉÏµÄ CPU
+         *      ²¢ÇÒÓĞºÏÊÊÇ¨ÒÆµ½´óºËÉÏµÄ½ø³Ì(¸ºÔØ´óÓÚ·§Öµ, ÇÒ½üÆÚÎ´·¢ÉúÇ¨ÒÆ, ½ø³ÌÓÅÏÈ¼¶Ò²Âú×ã·§ÖµÒªÇó)
+         *      ×îÖØÒªµÄÊÇ´óºËµ÷¶ÈÓòÉÏÓĞ¿ÕÏĞµÄ CPU,
+         *  Õâ½Ğ×÷ÎŞÇÉ²»³ÉÊé.
          *
-         *  æˆ‘ä»¬ä¸‹é¢çœ‹çœ‹æ²¡é‚£ä¹ˆå¥½è¿æ°”çš„å…¶ä»– CPU çš„æƒ…å†µ, ä¸€èˆ¬æ¥è¯´æœ‰å¦‚ä¸‹å‡ ç§æƒ…å†µ
-         *      hmp_up_migration( )è¿”å›äº† 0
-         *          ä¸€ç§æ˜¯è°ƒåº¦å®ä½“curréœ€è¦å‘ä¸Šè¿ç§», ä½†æ˜¯å¤§æ ¸çš„è°ƒåº¦åŸŸå†…æ²¡æœ‰ç©ºé—²çš„çš„å¤§æ ¸CPU
-         *          å¦å¤–ä¸€ç§æ˜¯è°ƒåº¦å®ä½“ä¸éœ€è¦è¿ç§»(ä¸æ»¡è¶³é˜€å€¼è¦æ±‚, æˆ–è€…curræœ¬èº«å°±åœ¨å¤§æ ¸ä¸Š)
+         *  ÎÒÃÇÏÂÃæ¿´¿´Ã»ÄÇÃ´ºÃÔËÆøµÄÆäËû CPU µÄÇé¿ö, Ò»°ãÀ´ËµÓĞÈçÏÂ¼¸ÖÖÇé¿ö
+         *      hmp_up_migration( )·µ»ØÁË 0
+         *          Ò»ÖÖÊÇµ÷¶ÈÊµÌåcurrĞèÒªÏòÉÏÇ¨ÒÆ, µ«ÊÇ´óºËµÄµ÷¶ÈÓòÄÚÃ»ÓĞ¿ÕÏĞµÄµÄ´óºËCPU
+         *          ÁíÍâÒ»ÖÖÊÇµ÷¶ÈÊµÌå²»ĞèÒªÇ¨ÒÆ(²»Âú×ã·§ÖµÒªÇó, »òÕßcurr±¾Éí¾ÍÔÚ´óºËÉÏ)
          *
-         *  æˆ‘ä»¬é¦–å…ˆè€ƒè™‘curræœ¬èº«å°±åœ¨å¤§æ ¸ä¸Šè¿è¡Œçš„æƒ…å†µå…¶ä»–çš„æƒ…å†µ,
-         *  currè¿è¡Œåœ¨å¤§æ ¸ä¸Šæ—¶hmp_get_heaviest_taskç›´æ¥è¿”å›äº†curr(æ­¤æ—¶orig == curr)
-         *  è€Œhmp_up_migration( )åœ¨åˆ¤æ–­è¿›ç¨‹åœ¨å¤§æ ¸ä¸Šè¿è¡Œæ—¶ä¹Ÿç›´æ¥è¿”å›äº†0,
+         *  ÎÒÃÇÊ×ÏÈ¿¼ÂÇcurr±¾Éí¾ÍÔÚ´óºËÉÏÔËĞĞµÄÇé¿öÆäËûµÄÇé¿ö,
+         *  currÔËĞĞÔÚ´óºËÉÏÊ±hmp_get_heaviest_taskÖ±½Ó·µ»ØÁËcurr(´ËÊ±orig == curr)
+         *  ¶øhmp_up_migration( )ÔÚÅĞ¶Ï½ø³ÌÔÚ´óºËÉÏÔËĞĞÊ±Ò²Ö±½Ó·µ»ØÁË0,
          */
 
-        /*  ä»»åŠ¡è¿ç§»åˆ†ä¸ºå‘ä¸Šè¿ç§»å’Œå‘ä¸‹è¿ç§»,
+        /*  ÈÎÎñÇ¨ÒÆ·ÖÎªÏòÉÏÇ¨ÒÆºÍÏòÏÂÇ¨ÒÆ,
          *
-         *  å‘ä¸Šè¿ç§»(hmp_up_migration)      -=> å°†å°æ ¸ä¸Šè´Ÿè½½æœ€å¤§ä¸”ç¬¦åˆè¿ç§»è¦æ±‚çš„è¿›ç¨‹è°ƒåº¦å®ä½“è¿ç§»è‡³ç©ºé—²çš„å¤§æ ¸target_cpu
-         *  å‘ä¸‹è¿ç§»(hmp_down_migration)    -=> å°†å¤§æ ¸ä¸Šè´Ÿè½½æœ€å°ä¸”ç¬¦åˆè¿ç§»è¦æ±‚çš„è¿›ç¨‹è°ƒåº¦å®ä½“è¿ç§»è‡³ç©ºé—²çš„å°æ ¸target_cpu
+         *  ÏòÉÏÇ¨ÒÆ(hmp_up_migration)      -=> ½«Ğ¡ºËÉÏ¸ºÔØ×î´óÇÒ·ûºÏÇ¨ÒÆÒªÇóµÄ½ø³Ìµ÷¶ÈÊµÌåÇ¨ÒÆÖÁ¿ÕÏĞµÄ´óºËtarget_cpu
+         *  ÏòÏÂÇ¨ÒÆ(hmp_down_migration)    -=> ½«´óºËÉÏ¸ºÔØ×îĞ¡ÇÒ·ûºÏÇ¨ÒÆÒªÇóµÄ½ø³Ìµ÷¶ÈÊµÌåÇ¨ÒÆÖÁ¿ÕÏĞµÄĞ¡ºËtarget_cpu
          *
-         *  æ¥ç€æ£€æŸ¥æ˜¯å¦å¯ä»¥è¿›è¡Œå‘ä¸‹è¿ç§»
+         *  ½Ó×Å¼ì²éÊÇ·ñ¿ÉÒÔ½øĞĞÏòÏÂÇ¨ÒÆ
          *
-         *  å¦‚æœå½“å‰éå†åˆ°çš„CPUæ ¸æ˜¯å¤§æ ¸, åˆ™
-         *      hmp_get_lightest_task   ä»è¯¥å¤§æ ¸ CPU ä¸Šæ‰¾åˆ°ä¸€ä¸ªè´Ÿè½½æœ€å°çš„è¿›ç¨‹è°ƒåº¦å®ä½“ curr
-         *      hmp_offload_down        åˆ¤æ–­è´Ÿè½½æœ€å°çš„è¿›ç¨‹æ˜¯å¦æ»¡è¶³è¿ç§»åˆ°å°æ ¸ä¸Šæ‰€éœ€çš„æ¡ä»¶
-         *                              å¦‚æœæ»¡è¶³è¿ç§»çš„è¦æ±‚, è€Œå½“å‰æ‰€æœ‰çš„å°æ ¸ä¸­ä¹Ÿæœ‰ç©ºé—²çš„å°æ ¸
-         *                              åˆ™è¿”å›å¯ä»¥è¿ç§»çš„ç©ºé—²çš„å°æ ¸
+         *  Èç¹ûµ±Ç°±éÀúµ½µÄCPUºËÊÇ´óºË, Ôò
+         *      hmp_get_lightest_task   ´Ó¸Ã´óºË CPU ÉÏÕÒµ½Ò»¸ö¸ºÔØ×îĞ¡µÄ½ø³Ìµ÷¶ÈÊµÌå curr
+         *      hmp_offload_down        ÅĞ¶Ï¸ºÔØ×îĞ¡µÄ½ø³ÌÊÇ·ñÂú×ãÇ¨ÒÆµ½Ğ¡ºËÉÏËùĞèµÄÌõ¼ş
+         *                              Èç¹ûÂú×ãÇ¨ÒÆµÄÒªÇó, ¶øµ±Ç°ËùÓĞµÄĞ¡ºËÖĞÒ²ÓĞ¿ÕÏĞµÄĞ¡ºË
+         *                              Ôò·µ»Ø¿ÉÒÔÇ¨ÒÆµÄ¿ÕÏĞµÄĞ¡ºË
          *
-         *      æ¥ç€å®Œå–„è¿ç§»ä¿¡æ¯, å¡«å……è¿ç§»æº CPU çš„ä»»åŠ¡é˜Ÿåˆ— rq(target) çš„ä¿¡æ¯,
-         *      åŒ…æ‹¬å¦‚ä¸‹ä¿¡æ¯    :
-         *          è¿ç§»ç›®æ ‡cpu(target->push_cpu)
-         *          å¾…è¿ç§»è¿›ç¨‹target->migrate_task = p;
+         *      ½Ó×ÅÍêÉÆÇ¨ÒÆĞÅÏ¢, Ìî³äÇ¨ÒÆÔ´ CPU µÄÈÎÎñ¶ÓÁĞ rq(target) µÄĞÅÏ¢,
+         *      °üÀ¨ÈçÏÂĞÅÏ¢    :
+         *          Ç¨ÒÆÄ¿±êcpu(target->push_cpu)
+         *          ´ıÇ¨ÒÆ½ø³Ìtarget->migrate_task = p;
          *
-         *      æœ€åå†…æ ¸å®Œæˆä»»åŠ¡çš„å‘ä¸‹è¿ç§»
-         *          å¦‚æœå¾…è¿ç§»çš„ä»»åŠ¡æ²¡åœ¨è¿è¡Œ, ç›´æ¥è°ƒç”¨ hmp_migrate_runnable_task(target)å®Œæˆä»»åŠ¡è¿ç§»
-         *          å¦‚æœå¸¦è¿ç§»çš„ä»»åŠ¡åœ¨è¿è¡Œ, åˆ™è°ƒç”¨ stop_one_cpu_nowait(cpu_of(target) æš‚åœè¿ç§»æº CPU å, å¼ºè¡Œè¿›è¡Œè¿ç§»
+         *      ×îºóÄÚºËÍê³ÉÈÎÎñµÄÏòÏÂÇ¨ÒÆ
+         *          Èç¹û´ıÇ¨ÒÆµÄÈÎÎñÃ»ÔÚÔËĞĞ, Ö±½Óµ÷ÓÃ hmp_migrate_runnable_task(target)Íê³ÉÈÎÎñÇ¨ÒÆ
+         *          Èç¹û´øÇ¨ÒÆµÄÈÎÎñÔÚÔËĞĞ, Ôòµ÷ÓÃ stop_one_cpu_nowait(cpu_of(target) ÔİÍ£Ç¨ÒÆÔ´ CPU ºó, Ç¿ĞĞ½øĞĞÇ¨ÒÆ
          */
-        if (!got_target) {                                      /*  å¦‚æœæ­¤æ—¶æ²¡æœ‰*/
+        if (!got_target) {                                      /*  Èç¹û´ËÊ±Ã»ÓĞ*/
                         /*
                          * For now we just check the currently running task.
                          * Selecting the lightest task for offloading will
                          * require extensive book keeping.
                          */
-                        curr = hmp_get_lightest_task(orig, 1);          /*  è¿”å› orig è°ƒåº¦å®ä½“å¯¹åº”çš„è¿è¡Œé˜Ÿåˆ—ä¸­ä»»åŠ¡æœ€è½»çš„è°ƒåº¦å®ä½“min_se  */
+                        curr = hmp_get_lightest_task(orig, 1);          /*  ·µ»Ø orig µ÷¶ÈÊµÌå¶ÔÓ¦µÄÔËĞĞ¶ÓÁĞÖĞÈÎÎñ×îÇáµÄµ÷¶ÈÊµÌåmin_se  */
                         p = task_of(curr);
-                        target->push_cpu = hmp_offload_down(cpu, curr); /*  æŸ¥è¯¢åˆšæ‰æ‰¾åˆ°çš„æœ€è½»è´Ÿè½½çš„è¿›ç¨‹èƒ½è¿ç§»åˆ°å“ªä¸ª CPUä¸Šå», è¿”å›è¿ç§»ç›®æ ‡target->push_cpu  */
-                        if (target->push_cpu < NR_CPUS) {               /*  å¦‚æœè¿”å›å€¼æ˜¯NR_CPUS, åˆ™è¡¨ç¤ºæ²¡æœ‰æ‰¾åˆ°åˆé€‚çš„è¿ç§»ç›®æ ‡CPU    */
+                        target->push_cpu = hmp_offload_down(cpu, curr); /*  ²éÑ¯¸Õ²ÅÕÒµ½µÄ×îÇá¸ºÔØµÄ½ø³ÌÄÜÇ¨ÒÆµ½ÄÄ¸ö CPUÉÏÈ¥, ·µ»ØÇ¨ÒÆÄ¿±êtarget->push_cpu  */
+                        if (target->push_cpu < NR_CPUS) {               /*  Èç¹û·µ»ØÖµÊÇNR_CPUS, Ôò±íÊ¾Ã»ÓĞÕÒµ½ºÏÊÊµÄÇ¨ÒÆÄ¿±êCPU    */
                                 get_task_struct(p);
                                 target->migrate_task = p;
                                 got_target = 1;
                                 trace_sched_hmp_migrate(p, target->push_cpu, HMP_MIGRATE_OFFLOAD);
-                                hmp_next_down_delay(&p->se, target->push_cpu);      /*  æ›´æ–°è°ƒåº¦å®ä½“çš„hmp_last_down_migrationå’Œhmp_last_up_migration è®°å½•ä¸ºç°åœ¨æ—¶åˆ»çš„æ—¶é—´   */
+                                hmp_next_down_delay(&p->se, target->push_cpu);      /*  ¸üĞÂµ÷¶ÈÊµÌåµÄhmp_last_down_migrationºÍhmp_last_up_migration ¼ÇÂ¼ÎªÏÖÔÚÊ±¿ÌµÄÊ±¼ä   */
                         }
                 }
                 /*
@@ -9425,22 +9427,22 @@ static void hmp_force_up_migration(int this_cpu)
                  * CPU stopper take care of it.
                  */
                 if (got_target) {
-                        if (!task_running(target, p)) {     /*  å¦‚æœè¦è¿ç§»çš„è¿›ç¨‹pæ²¡æœ‰æ­£åœ¨è¿è¡Œ, å³p->on_cpu == 0, åˆ™å¯ä»¥è¿›è¡Œè¿ç§» */
+                        if (!task_running(target, p)) {     /*  Èç¹ûÒªÇ¨ÒÆµÄ½ø³ÌpÃ»ÓĞÕıÔÚÔËĞĞ, ¼´p->on_cpu == 0, Ôò¿ÉÒÔ½øĞĞÇ¨ÒÆ */
                                 trace_sched_hmp_migrate_force_running(p, 0);
-                                hmp_migrate_runnable_task(target);  /*  å®Œæˆä»»åŠ¡è¿ç§»*/
-                        } else {                            /*  å¦åˆ™å¾…è¿ç§»çš„è¿›ç¨‹å¦‚æœæ­£åœ¨è¿è¡Œ            */
-                                target->active_balance = 1;     /*  è®¾ç½® target è¿è¡Œé˜Ÿåˆ—çš„ avtive_balance   */
-                                force = 1;                      /*  è®¾ç½®å¼ºåˆ¶è¿ç§»æ ‡ç¤ºä¸º1                     */
+                                hmp_migrate_runnable_task(target);  /*  Íê³ÉÈÎÎñÇ¨ÒÆ*/
+                        } else {                            /*  ·ñÔò´ıÇ¨ÒÆµÄ½ø³ÌÈç¹ûÕıÔÚÔËĞĞ            */
+                                target->active_balance = 1;     /*  ÉèÖÃ target ÔËĞĞ¶ÓÁĞµÄ avtive_balance   */
+                                force = 1;                      /*  ÉèÖÃÇ¿ÖÆÇ¨ÒÆ±êÊ¾Îª1                     */
                         }
                 }
 
                 raw_spin_unlock_irqrestore(&target->lock, flags);
 
-                if (force)              /*  ä¾ç…§å‰é¢æ‰€è¿°, å¾…è¿ç§»çš„è¿›ç¨‹ p æ­£åœ¨è¿è¡Œä¸­, åˆ™ forceè¢«ç½®ä¸º 1 */
+                if (force)              /*  ÒÀÕÕÇ°ÃæËùÊö, ´ıÇ¨ÒÆµÄ½ø³Ì p ÕıÔÚÔËĞĞÖĞ, Ôò force±»ÖÃÎª 1 */
                         stop_one_cpu_nowait(cpu_of(target),
                                 hmp_active_task_migration_cpu_stop,
-                                target, &target->active_balance_work);  /*  æš‚åœè¿ç§»æº CPU å, å¼ºè¡Œè¿›è¡Œè¿ç§» */
-        /*  è‡ªæ­¤æˆ‘ä»¬äº†è§£åˆ°, å¦‚æœ*/
+                                target, &target->active_balance_work);  /*  ÔİÍ£Ç¨ÒÆÔ´ CPU ºó, Ç¿ĞĞ½øĞĞÇ¨ÒÆ */
+        /*  ×Ô´ËÎÒÃÇÁË½âµ½, Èç¹û*/
         }
         spin_unlock(&hmp_force_migration);
 }
@@ -9465,16 +9467,16 @@ static unsigned int hmp_idle_pull(int this_cpu)
         unsigned int force = 0;
         struct task_struct *p = NULL;
 
-        if (!hmp_cpu_is_slowest(this_cpu))      /*  æ£€æŸ¥å½“å‰ CPU æ˜¯ä¸æ˜¯å¤§æ ¸ */
-                hmp_domain = hmp_slower_domain(this_cpu);   /*  å¦‚æœæ˜¯å¤§æ ¸(ä¸æ˜¯å°æ ¸), åˆ™å–å‡ºå°æ ¸çš„ domain ç»“æ„*/
+        if (!hmp_cpu_is_slowest(this_cpu))      /*  ¼ì²éµ±Ç° CPU ÊÇ²»ÊÇ´óºË */
+                hmp_domain = hmp_slower_domain(this_cpu);   /*  Èç¹ûÊÇ´óºË(²»ÊÇĞ¡ºË), ÔòÈ¡³öĞ¡ºËµÄ domain ½á¹¹*/
         if (!hmp_domain)
                 return 0;
 
-        if (!spin_trylock(&hmp_force_migration))    /*  åŠ é”    */
+        if (!spin_trylock(&hmp_force_migration))    /*  ¼ÓËø    */
                 return 0;
 
         /* first select a task
-     * forå¾ªç¯éå†å°æ ¸è°ƒåº¦åŸŸä¸Šçš„æ‰€æœ‰ CPU, æ‰¾å‡ºè¯¥ CPU çš„è¿è¡Œé˜Ÿåˆ—ä¸­è´Ÿè½½æœ€é‡çš„è¿›ç¨‹ curr    */
+     * forÑ­»·±éÀúĞ¡ºËµ÷¶ÈÓòÉÏµÄËùÓĞ CPU, ÕÒ³ö¸Ã CPU µÄÔËĞĞ¶ÓÁĞÖĞ¸ºÔØ×îÖØµÄ½ø³Ì curr    */
         for_each_cpu(cpu, &hmp_domain->cpus) {
                 rq = cpu_rq(cpu);
                 raw_spin_lock_irqsave(&rq->lock, flags);
@@ -9496,11 +9498,11 @@ static unsigned int hmp_idle_pull(int this_cpu)
                         }
                 }
                 orig = curr;
-                curr = hmp_get_heaviest_task(curr, this_cpu);   /*  ä»å½“å‰CPUä¸­æ‰¾åˆ°è´Ÿè½½æœ€å¤§(å³æœ€ç¹å¿™)çš„é‚£ä¸ªè¿›ç¨‹ */
+                curr = hmp_get_heaviest_task(curr, this_cpu);   /*  ´Óµ±Ç°CPUÖĞÕÒµ½¸ºÔØ×î´ó(¼´×î·±Ã¦)µÄÄÇ¸ö½ø³Ì */
                 /* check if heaviest eligible task on this
                  * CPU is heavier than previous task
                  */
-                if (curr && hmp_task_eligible_for_up_migration(curr) && /*  å…ˆåˆ¤æ–­è¿™ä¸ªè´Ÿè½½é‡çš„è¿›ç¨‹æ˜¯å¦åˆé€‚è¿ç§»åˆ°å¤§æ ¸ CPU ä¸Š(æ¯”è¾ƒå…¶è´Ÿè½½æ˜¯å¦å¤§äºé˜€å€¼)   */
+                if (curr && hmp_task_eligible_for_up_migration(curr) && /*  ÏÈÅĞ¶ÏÕâ¸ö¸ºÔØÖØµÄ½ø³ÌÊÇ·ñºÏÊÊÇ¨ÒÆµ½´óºË CPU ÉÏ(±È½ÏÆä¸ºÔØÊÇ·ñ´óÓÚ·§Öµ)   */
                         curr->avg.load_avg_ratio > ratio &&
                         cpumask_test_cpu(this_cpu,
                                         tsk_cpus_allowed(task_of(curr)))) {
@@ -9515,36 +9517,36 @@ static unsigned int hmp_idle_pull(int this_cpu)
                 goto done;
 
         /* now we have a candidate
-     * è¿ç§»è¿›ç¨‹ migrate_task    :   æ˜¯åˆšæ‰æ‰¾åˆ°çš„ p = task_of(curr) è¿›ç¨‹
-     * è¿ç§»æº CPU               :   è¿ç§»è¿›ç¨‹å¯¹åº”çš„ CPU
-     * è¿ç§»ç›®çš„åœ° CPU           :   å½“å‰ CPU, å½“å‰ CPU æ˜¯å¤§æ ¸è°ƒåº¦åŸŸä¸­çš„ä¸€ä¸ª
+     * Ç¨ÒÆ½ø³Ì migrate_task    :   ÊÇ¸Õ²ÅÕÒµ½µÄ p = task_of(curr) ½ø³Ì
+     * Ç¨ÒÆÔ´ CPU               :   Ç¨ÒÆ½ø³Ì¶ÔÓ¦µÄ CPU
+     * Ç¨ÒÆÄ¿µÄµØ CPU           :   µ±Ç° CPU, µ±Ç° CPU ÊÇ´óºËµ÷¶ÈÓòÖĞµÄÒ»¸ö
      * */
         raw_spin_lock_irqsave(&target->lock, flags);
         if (!target->active_balance && task_rq(p) == target) {
                 get_task_struct(p);
-                target->push_cpu = this_cpu;        /*  è¿ç§»çš„ç›®çš„ CPU  */
-                target->migrate_task = p;           /*  å¾…è¿ç§»çš„è¿›ç¨‹    */
+                target->push_cpu = this_cpu;        /*  Ç¨ÒÆµÄÄ¿µÄ CPU  */
+                target->migrate_task = p;           /*  ´ıÇ¨ÒÆµÄ½ø³Ì    */
                 trace_sched_hmp_migrate(p, target->push_cpu, HMP_MIGRATE_IDLE_PULL);
-                hmp_next_up_delay(&p->se, target->push_cpu);    /*  æ›´æ–°å½“å‰è¿ç§»çš„æ—¶é—´ä¸º now    */
+                hmp_next_up_delay(&p->se, target->push_cpu);    /*  ¸üĞÂµ±Ç°Ç¨ÒÆµÄÊ±¼äÎª now    */
                 /*
                  * if the task isn't running move it right away.
                  * Otherwise setup the active_balance mechanic and let
                  * the CPU stopper do its job.
                  */
-                if (!task_running(target, p)) {                     /*  å¦‚æœå¾…è¿ç§»çš„è¿›ç¨‹ä¸åœ¨è¿è¡Œ    */
+                if (!task_running(target, p)) {                     /*  Èç¹û´ıÇ¨ÒÆµÄ½ø³Ì²»ÔÚÔËĞĞ    */
                         trace_sched_hmp_migrate_idle_running(p, 0);
-                        hmp_migrate_runnable_task(target);              /*  ç›´æ¥å¯¹è¿›ç¨‹è¿›è¡Œè¿ç§»          */
+                        hmp_migrate_runnable_task(target);              /*  Ö±½Ó¶Ô½ø³Ì½øĞĞÇ¨ÒÆ          */
                 } else {
                         target->active_balance = 1;
-                        force = 1;                                      /*  å¦åˆ™è®¾ç½®å¼ºåˆ¶è¿ç§»æ ‡è¯† force ä¸º 1 */
+                        force = 1;                                      /*  ·ñÔòÉèÖÃÇ¿ÖÆÇ¨ÒÆ±êÊ¶ force Îª 1 */
                 }
         }
         raw_spin_unlock_irqrestore(&target->lock, flags);
 
         if (force) {
                 /* start timer to keep us awake */
-                hmp_cpu_keepalive_trigger();                    /*  ä¸ºå¤§æ ¸è®¾ç½®ä¿æ´»ç›‘æ§å®šæ—¶å™¨  */
-                stop_one_cpu_nowait(cpu_of(target),             /*  å¦‚æœè¿ç§»è¿›ç¨‹æ­£åœ¨è¿è¡Œ, é‚£ä¹ˆå’Œä¹‹å‰ä¸€æ ·, è°ƒç”¨ stop_one_cpu_nowait( ) å‡½æ•°å¼ºè¡Œè¿ç§»  */
+                hmp_cpu_keepalive_trigger();                    /*  Îª´óºËÉèÖÃ±£»î¼à¿Ø¶¨Ê±Æ÷  */
+                stop_one_cpu_nowait(cpu_of(target),             /*  Èç¹ûÇ¨ÒÆ½ø³ÌÕıÔÚÔËĞĞ, ÄÇÃ´ºÍÖ®Ç°Ò»Ñù, µ÷ÓÃ stop_one_cpu_nowait( ) º¯ÊıÇ¿ĞĞÇ¨ÒÆ  */
                         hmp_active_task_migration_cpu_stop,
                         target, &target->active_balance_work);
         }
@@ -9567,16 +9569,16 @@ static void run_rebalance_domains(struct softirq_action *h)
 #ifdef CONFIG_SCHED_HMP
         /* shortcut for hmp idle pull wakeups
         *
-        * é¦–å…ˆæ£€æŸ¥å½“å‰CPUè¿è¡Œé˜Ÿåˆ—çš„wake_for_idle_pull æ ‡è¯†
-        * è¯¥æ ‡å¿—ä½æ˜¯è¯´
-        *  æœ‰ä¸€ä¸ªå°æ ¸è°ƒåº¦åŸŸä¸Šçš„æ¯”è¾ƒç¹å¿™çš„è¿›ç¨‹éœ€è¦è¢«è¿ç§»åˆ°å¤§æ ¸ä¸Š
-        *  è€Œå¤§æ ¸çš„è°ƒåº¦åŸŸä¸Šåˆšå¥½æœ‰ä¸€ä¸ªç©ºé—²çš„ CPU
+        * Ê×ÏÈ¼ì²éµ±Ç°CPUÔËĞĞ¶ÓÁĞµÄwake_for_idle_pull ±êÊ¶
+        * ¸Ã±êÖ¾Î»ÊÇËµ
+        *  ÓĞÒ»¸öĞ¡ºËµ÷¶ÈÓòÉÏµÄ±È½Ï·±Ã¦µÄ½ø³ÌĞèÒª±»Ç¨ÒÆµ½´óºËÉÏ
+        *  ¶ø´óºËµÄµ÷¶ÈÓòÉÏ¸ÕºÃÓĞÒ»¸ö¿ÕÏĞµÄ CPU
         *
-        *  é‚£ä¹ˆè¿™æ ·æ­£å¥½å¯ä»¥é€‚åˆæŠŠè¯¥è¿›ç¨‹è¿ç§»åˆ°å¤§æ ¸çš„ç©ºé—²CPUä¸Š
+        *  ÄÇÃ´ÕâÑùÕıºÃ¿ÉÒÔÊÊºÏ°Ñ¸Ã½ø³ÌÇ¨ÒÆµ½´óºËµÄ¿ÕÏĞCPUÉÏ
         * */
         if (unlikely(this_rq->wake_for_idle_pull)) {
-                this_rq->wake_for_idle_pull = 0;    /*  æ¸…æ¥šå¤§æ ¸ä¸Šçš„ wake_for_idle_pull æ ‡ç¤º */
-                if (hmp_idle_pull(this_cpu)) {      /*  idle çš„å¤§æ ¸ CPU(this_cpu) å¼€å§‹ pull è¿›ç¨‹ä»åˆ«çš„ CPU ä¸Š   */
+                this_rq->wake_for_idle_pull = 0;    /*  Çå³ş´óºËÉÏµÄ wake_for_idle_pull ±êÊ¾ */
+                if (hmp_idle_pull(this_cpu)) {      /*  idle µÄ´óºË CPU(this_cpu) ¿ªÊ¼ pull ½ø³Ì´Ó±ğµÄ CPU ÉÏ   */
                         /* break out unless running nohz idle as well */
                         if (idle != CPU_IDLE)
                                 return;
@@ -9634,10 +9636,7 @@ static void rq_offline_fair(struct rq *rq)
         /* Ensure any throttled groups are reachable by pick_next_task */
         unthrottle_offline_cfs_rqs(rq);
 }
-
-//////////////////////////////////
-///      endif  CONFIG_SCHED_HMP
-//////////////////////////////////
+#endif  /*      CONFIG_SCHED_HMP        */
 
 #endif /* CONFIG_SMP */
 
@@ -10093,8 +10092,8 @@ void print_cfs_stats(struct seq_file *m, int cpu)
 __init void init_sched_fair_class(void)
 {
 #ifdef CONFIG_SMP
-    /*  å’Œå†…æ ¸ä¸­é»˜è®¤çš„è´Ÿè½½å‡è¡¡è°ƒåº¦å™¨ä¸€æ ·éœ€è¦æ³¨å†Œä¸€ä¸ªè½¯ä¸­æ–­softirq,
-     *  å›è°ƒå‡½æ•°æ˜¯run_rebalance_domains( ) */
+    /*  ºÍÄÚºËÖĞÄ¬ÈÏµÄ¸ºÔØ¾ùºâµ÷¶ÈÆ÷Ò»ÑùĞèÒª×¢²áÒ»¸öÈíÖĞ¶Ïsoftirq,
+     *  »Øµ÷º¯ÊıÊÇrun_rebalance_domains( ) */
     open_softirq(SCHED_SOFTIRQ, run_rebalance_domains);
 
 #ifdef CONFIG_NO_HZ_COMMON
@@ -10104,14 +10103,14 @@ __init void init_sched_fair_class(void)
 #endif          /*      CONFIG_NO_HZ_COMMON     */
 
 #ifdef CONFIG_SCHED_HMP
-    /*  å¦å¤–ä¸€ä¸ªå°±æ˜¯å»ºç«‹ HMP çš„ CPU æ‹“æ‰‘å…³ç³»(CPU TOPOLOBY)
-     *  [CPU çš„æ‹“æ‰‘ç»“æ„å¯ä»¥å‚è§, include/linux/topology.h æˆ–è€…å…·ä½“ä½“ç³»ç»“æ„çš„å®ç°]
-     *  HMP è°ƒåº¦å™¨é‡æ–°å®šä¹‰äº† domain çš„å®ç°,
-     *  å®šä¹‰äº† struct hmp_domain æ•°æ®ç»“æ„(include/linux/sched.h)
-     *  è¯¥ç»“æ„æ¯”è¾ƒç®€å•, cpus å’Œ possible_cpus ä¸¤ä¸ª cpumask å˜é‡ä»¥åŠä¸€ä¸ªé“¾è¡¨èŠ‚ç‚¹.
-     *  hmp_cpu_domain æ˜¯å®šä¹‰ä¸º pre-CPU å˜é‡,
-     *  å³æ¯ä¸ª CPU æœ‰ä¸€ä¸ª struct hmp_domain æ•°æ®ç»“æ„,
-     *  å¦å¤–è¿˜å®šä¹‰äº†ä¸€ä¸ªå…¨å±€çš„é“¾è¡¨ hmp_domains */
+    /*  ÁíÍâÒ»¸ö¾ÍÊÇ½¨Á¢ HMP µÄ CPU ÍØÆË¹ØÏµ(CPU TOPOLOBY)
+     *  [CPU µÄÍØÆË½á¹¹¿ÉÒÔ²Î¼û, include/linux/topology.h »òÕß¾ßÌåÌåÏµ½á¹¹µÄÊµÏÖ]
+     *  HMP µ÷¶ÈÆ÷ÖØĞÂ¶¨ÒåÁË domain µÄÊµÏÖ,
+     *  ¶¨ÒåÁË struct hmp_domain Êı¾İ½á¹¹(include/linux/sched.h)
+     *  ¸Ã½á¹¹±È½Ï¼òµ¥, cpus ºÍ possible_cpus Á½¸ö cpumask ±äÁ¿ÒÔ¼°Ò»¸öÁ´±í½Úµã.
+     *  hmp_cpu_domain ÊÇ¶¨ÒåÎª pre-CPU ±äÁ¿,
+     *  ¼´Ã¿¸ö CPU ÓĞÒ»¸ö struct hmp_domain Êı¾İ½á¹¹,
+     *  ÁíÍâ»¹¶¨ÒåÁËÒ»¸öÈ«¾ÖµÄÁ´±í hmp_domains */
     hmp_cpu_mask_setup();
 #endif  /*      CONFIG_SCHED_HMP        */
 #endif  /*      CONFIG_SMP              */
