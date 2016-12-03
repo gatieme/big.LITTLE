@@ -11,6 +11,10 @@
  * for more details.
  */
 
+// for debug
+//#define CONFIG_SCHED_HMP_ENHANCEMENT
+//#define CONFIG_SCHED_HMP
+//
 #include <linux/cpu.h>
 #include <linux/cpumask.h>
 #include <linux/export.h>
@@ -823,143 +827,12 @@ void __init arch_build_cpu_topology_domain(void)
 
 
 
-
 #ifdef CONFIG_SCHED_HMP
 
 
 /*      add by gatieme for 改进的 HMP 调度器   2016-12-01 21:47 */
-#ifndef CONFIG_SCHED_HMP_ENHANCEMENT
-/*	defined(CONFIG_SCHED_HMP)  && !defined(CONFIG_SCHED_HMP_ENHANCEMENT)		*/
+#ifdef CONFIG_SCHED_HMP_ENHANCEMENT
 
-/*
- * Retrieve logical cpu index corresponding to a given MPIDR[23:0]
- *  - mpidr: MPIDR[23:0] to be used for the look-up
- *
- * Returns the cpu logical index or -EINVAL on look-up error
- */
-static inline int get_logical_index(u32 mpidr)
-{
-	int cpu;
-	for (cpu = 0; cpu < nr_cpu_ids; cpu++)
-		if (cpu_logical_map(cpu) == mpidr)
-			return cpu;
-	return -EINVAL;
-}
-
-static const char * const little_cores[] = {
-	"arm,cortex-a53",
-	NULL,
-};
-
-static bool is_little_cpu(struct device_node *cn)
-{
-	const char * const *lc;
-	for (lc = little_cores; *lc; lc++)
-		if (of_device_is_compatible(cn, *lc))
-			return true;
-	return false;
-}
-
-void __init arch_get_fast_and_slow_cpus(struct cpumask *fast,
-					struct cpumask *slow)
-{
-	struct device_node *cn = NULL;
-	int cpu;
-
-	cpumask_clear(fast);
-	cpumask_clear(slow);
-
-	/*
-	 * Use the config options if they are given. This helps testing
-	 * HMP scheduling on systems without a big.LITTLE architecture.
-	 */
-	if (strlen(CONFIG_HMP_FAST_CPU_MASK) && strlen(CONFIG_HMP_SLOW_CPU_MASK)) {
-		if (cpulist_parse(CONFIG_HMP_FAST_CPU_MASK, fast))
-			WARN(1, "Failed to parse HMP fast cpu mask!\n");
-		if (cpulist_parse(CONFIG_HMP_SLOW_CPU_MASK, slow))
-			WARN(1, "Failed to parse HMP slow cpu mask!\n");
-		return;
-	}
-
-	/*
-	 * Else, parse device tree for little cores.
-	 */
-	while ((cn = of_find_node_by_type(cn, "cpu"))) {
-
-		const u32 *mpidr;
-		int len;
-
-		mpidr = of_get_property(cn, "reg", &len);
-		if (!mpidr || len != 8) {
-			pr_err("%s missing reg property\n", cn->full_name);
-			continue;
-		}
-
-		cpu = get_logical_index(be32_to_cpup(mpidr+1));
-		if (cpu == -EINVAL) {
-			pr_err("couldn't get logical index for mpidr %x\n",
-							be32_to_cpup(mpidr+1));
-			break;
-		}
-
-		if (is_little_cpu(cn))
-			cpumask_set_cpu(cpu, slow);
-		else
-			cpumask_set_cpu(cpu, fast);
-	}
-
-	if (!cpumask_empty(fast) && !cpumask_empty(slow))
-		return;
-
-	/*
-	 * We didn't find both big and little cores so let's call all cores
-	 * fast as this will keep the system running, with all cores being
-	 * treated equal.
-	 */
-	cpumask_setall(fast);
-	cpumask_clear(slow);
-}
-
-struct cpumask hmp_slow_cpu_mask;
-
-
-/*
- *  HMP负载均衡调度器实现了自己的CPU拓扑结构,
- *  该函数用于初始化HMP的cpu拓扑结构
- *
- *  调用关系
- *  init_sched_fair_class( )
- *      ->hmp_cpu_mask_setup( )
- *          ->arch_get_hmp_domains( )
- *  */
-void __init arch_get_hmp_domains(struct list_head *hmp_domains_list)
-{
-	struct cpumask hmp_fast_cpu_mask;
-	struct hmp_domain *domain;
-
-    /*  获取大小核的 CPU MASK (hmp_hast_cpu_mask, hmp_slow_cpu_mask)    */
-	arch_get_fast_and_slow_cpus(&hmp_fast_cpu_mask, &hmp_slow_cpu_mask);
-
-	/*
-	 * Initialize hmp_domains
-	 * Must be ordered with respect to compute capacity.
-	 * Fastest domain at head of list.
-	 */
-	if(!cpumask_empty(&hmp_slow_cpu_mask)) {
-		domain = (struct hmp_domain *)
-			kmalloc(sizeof(struct hmp_domain), GFP_KERNEL);
-		cpumask_copy(&domain->possible_cpus, &hmp_slow_cpu_mask);
-		cpumask_and(&domain->cpus, cpu_online_mask, &domain->possible_cpus);
-		list_add(&domain->hmp_domains, hmp_domains_list);
-	}
-	domain = (struct hmp_domain *)
-		kmalloc(sizeof(struct hmp_domain), GFP_KERNEL);
-	cpumask_copy(&domain->possible_cpus, &hmp_fast_cpu_mask);
-	cpumask_and(&domain->cpus, cpu_online_mask, &domain->possible_cpus);
-	list_add(&domain->hmp_domains, hmp_domains_list);
-}
-
-#else /*	ifdef  CONFIG_SCHED_HMP_ENHANCEMENT	*/
 
 void __init arch_get_fast_and_slow_cpus(struct cpumask *fast, struct cpumask *slow)
 {
@@ -1032,6 +905,7 @@ void __init arch_get_hmp_domains(struct list_head *hmp_domains_list)
 
 
 #ifdef CONFIG_ARCH_SCALE_INVARIANT_CPU_CAPACITY
+
 #include <linux/cpufreq.h>
 #define ARCH_SCALE_INVA_CPU_CAP_PERCLS 1
 
@@ -1329,7 +1203,139 @@ int arch_better_capacity(unsigned int cpu)
 	return __cpu_capacity[cpu].capacity > min_capacity;
 }
 
+
+
+#else   /*	defined(CONFIG_SCHED_HMP)  && !defined(CONFIG_SCHED_HMP_ENHANCEMENT)		*/
+
+/*
+ * Retrieve logical cpu index corresponding to a given MPIDR[23:0]
+ *  - mpidr: MPIDR[23:0] to be used for the look-up
+ *
+ * Returns the cpu logical index or -EINVAL on look-up error
+ */
+static inline int get_logical_index(u32 mpidr)
+{
+        int cpu;
+        for (cpu = 0; cpu < nr_cpu_ids; cpu++)
+                if (cpu_logical_map(cpu) == mpidr)
+                        return cpu;
+        return -EINVAL;
+}
+
+static const char * const little_cores[] = {
+        "arm,cortex-a53",
+        NULL,
+};
+
+static bool is_little_cpu(struct device_node *cn)
+{
+        const char * const *lc;
+        for (lc = little_cores; *lc; lc++)
+                if (of_device_is_compatible(cn, *lc))
+                        return true;
+        return false;
+}
+
+void __init arch_get_fast_and_slow_cpus(struct cpumask *fast,
+                                        struct cpumask *slow)
+{
+        struct device_node *cn = NULL;
+        int cpu;
+
+        cpumask_clear(fast);
+        cpumask_clear(slow);
+
+        /*
+         * Use the config options if they are given. This helps testing
+         * HMP scheduling on systems without a big.LITTLE architecture.
+         */
+        if (strlen(CONFIG_HMP_FAST_CPU_MASK) && strlen(CONFIG_HMP_SLOW_CPU_MASK)) {
+                if (cpulist_parse(CONFIG_HMP_FAST_CPU_MASK, fast))
+                        WARN(1, "Failed to parse HMP fast cpu mask!\n");
+                if (cpulist_parse(CONFIG_HMP_SLOW_CPU_MASK, slow))
+                        WARN(1, "Failed to parse HMP slow cpu mask!\n");
+                return;
+        }
+
+        /*
+         * Else, parse device tree for little cores.
+         */
+        while ((cn = of_find_node_by_type(cn, "cpu"))) {
+
+                const u32 *mpidr;
+                int len;
+
+                mpidr = of_get_property(cn, "reg", &len);
+                if (!mpidr || len != 8) {
+                        pr_err("%s missing reg property\n", cn->full_name);
+                        continue;
+                }
+
+                cpu = get_logical_index(be32_to_cpup(mpidr+1));
+                if (cpu == -EINVAL) {
+                        pr_err("couldn't get logical index for mpidr %x\n",
+                                                        be32_to_cpup(mpidr+1));
+                        break;
+                }
+
+                if (is_little_cpu(cn))
+                        cpumask_set_cpu(cpu, slow);
+                else
+                        cpumask_set_cpu(cpu, fast);
+        }
+
+        if (!cpumask_empty(fast) && !cpumask_empty(slow))
+                return;
+
+        /*
+         * We didn't find both big and little cores so let's call all cores
+         * fast as this will keep the system running, with all cores being
+         * treated equal.
+         */
+        cpumask_setall(fast);
+        cpumask_clear(slow);
+}
+
+struct cpumask hmp_slow_cpu_mask;
+
+
+/*
+ *  HMP负载均衡调度器实现了自己的CPU拓扑结构,
+ *  该函数用于初始化HMP的cpu拓扑结构
+ *
+ *  调用关系
+ *  init_sched_fair_class( )
+ *      ->hmp_cpu_mask_setup( )
+ *          ->arch_get_hmp_domains( )
+ *  */
+void __init arch_get_hmp_domains(struct list_head *hmp_domains_list)
+{
+        struct cpumask hmp_fast_cpu_mask;
+        struct hmp_domain *domain;
+
+    /*  获取大小核的 CPU MASK (hmp_hast_cpu_mask, hmp_slow_cpu_mask)    */
+        arch_get_fast_and_slow_cpus(&hmp_fast_cpu_mask, &hmp_slow_cpu_mask);
+
+        /*
+         * Initialize hmp_domains
+         * Must be ordered with respect to compute capacity.
+         * Fastest domain at head of list.
+         */
+        if(!cpumask_empty(&hmp_slow_cpu_mask)) {
+                domain = (struct hmp_domain *)
+                        kmalloc(sizeof(struct hmp_domain), GFP_KERNEL);
+                cpumask_copy(&domain->possible_cpus, &hmp_slow_cpu_mask);
+                cpumask_and(&domain->cpus, cpu_online_mask, &domain->possible_cpus);
+                list_add(&domain->hmp_domains, hmp_domains_list);
+        }
+        domain = (struct hmp_domain *)
+                kmalloc(sizeof(struct hmp_domain), GFP_KERNEL);
+        cpumask_copy(&domain->possible_cpus, &hmp_fast_cpu_mask);
+        cpumask_and(&domain->cpus, cpu_online_mask, &domain->possible_cpus);
+        list_add(&domain->hmp_domains, hmp_domains_list);
+}
 #endif          /*	ifdef  CONFIG_SCHED_HMP_ENHANCEMENT	else    */
+
 
 #endif /* CONFIG_SCHED_HMP */
 

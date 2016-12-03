@@ -44,6 +44,11 @@ void store_cpu_topology(unsigned int cpuid);
 const struct cpumask *cpu_coregroup_mask(int cpu);
 
 #ifdef CONFIG_DISABLE_CPU_SCHED_DOMAIN_BALANCE
+
+
+#if defined (CONFIG_HMP_PACK_SMALL_TASK) && !defined(CONFIG_MTK_SCHED_CMP)
+
+
 /* Common values for CPUs */
 #ifndef SD_CPU_INIT
 #define SD_CPU_INIT (struct sched_domain) {				\
@@ -72,14 +77,56 @@ const struct cpumask *cpu_coregroup_mask(int cpu);
 	.balance_interval	= 1,					\
 }
 #endif
+#endif /* CONFIG_HMP_PACK_SMALL_TASK */
+
 #endif /* CONFIG_DISABLE_CPU_SCHED_DOMAIN_BALANCE */
 
-#else
+/* CPU cluster functions */
+extern void arch_build_cpu_topology_domain(void);
+extern int arch_cpu_is_big(unsigned int cpu);
+extern int arch_cpu_is_little(unsigned int cpu);
+extern int arch_is_multi_cluster(void);
+extern int arch_is_smp(void);
+extern int arch_get_nr_clusters(void);
+extern int arch_get_cluster_id(unsigned int cpu);
+extern void arch_get_cluster_cpus(struct cpumask *cpus, int cluster_id);
+extern void arch_get_big_little_cpus(struct cpumask *big, struct cpumask *little);
+extern int arch_better_capacity(unsigned int cpu);
+
+#else /* !CONFIG_ARM_CPU_TOPOLOGY */
 
 static inline void init_cpu_topology(void) { }
 static inline void store_cpu_topology(unsigned int cpuid) { }
+static inline int cluster_to_logical_mask(unsigned int socket_id,
+        cpumask_t *cluster_mask) { return -EINVAL; }
 
-#endif
+static inline void arch_build_cpu_topology_domain(void) {}
+static inline int arch_cpu_is_big(unsigned int cpu) { return 0; }
+static inline int arch_cpu_is_little(unsigned int cpu) { return 1; }
+static inline int arch_is_multi_cluster(void) { return 0; }
+static inline int arch_is_smp(void) { return 1; }
+static inline int arch_get_nr_clusters(void) { return 1; }
+static inline int arch_get_cluster_id(unsigned int cpu) { return 0; }
+static inline void arch_get_cluster_cpus(struct cpumask *cpus, int cluster_id)
+{
+    cpumask_clear(cpus);
+        if (0 == cluster_id) {
+        unsigned int cpu;
+                for_each_possible_cpu(cpu)
+                        cpumask_set_cpu(cpu, cpus);
+        }
+}
+static inline void arch_get_big_little_cpus(struct cpumask *big,struct cpumask *little)
+{
+    unsigned int cpu;
+    cpumask_clear(big);
+    cpumask_clear(little);
+    for_each_possible_cpu(cpu)
+        cpumask_set_cpu(cpu, little);
+}
+static inline int arch_better_capacity(unsigned int cpu) { return 0; }
+
+#endif /* CONFIG_ARM_CPU_TOPOLOGY */
 
 #include <asm-generic/topology.h>
 

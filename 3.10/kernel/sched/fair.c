@@ -30,7 +30,30 @@
 #include <linux/migrate.h>
 #include <linux/task_work.h>
 
+#ifdef CONFIG_HMP_PACK_STOP_MACHINE
+#include <linux/stop_machine.h>
+#endif  /*     #ifdef CONFIG_HMP_PACK_STOP_MACHINE      */
+
 #include <trace/events/sched.h>
+
+/*
+#define CONFIG_SMP
+#define CONFIG_CPU_IDLE
+#define CONFIG_HMP_VARIABLE_SCALE
+#define CONFIG_SCHED_HMP
+#define CONFIG_SCHED_HMP_ENHANCEMENT
+#define CONFIG_HMP_PACK_SMALL_TASK
+#define USE_HMP_DYNAMIC_THRESHOLD
+#define CONFIG_HMP_PACK_BUDDY_INFO
+#define CONFIG_FAIR_GROUP_SCHED
+#define CONFIG_HMP_FREQUENCY_INVARIANT_SCALE
+#define CONFIG_SCHEDSTATS
+#define CONFIG_HMP_TRACER
+#define CONFIG_HMP_POWER_AWARE_CONTROLLER
+#define CONFIG_HMP_PACK_SMALL_TASK
+#define CONFIG_NO_HZ_COMMON
+*/
+
 
 #ifdef  CONFIG_HMP_VARIABLE_SCALE
 #include <linux/sysfs.h>
@@ -1321,7 +1344,10 @@ account_entity_dequeue(struct cfs_rq *cfs_rq, struct sched_entity *se)
 }
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
-# ifdef CONFIG_SMP
+
+
+#ifdef CONFIG_SMP
+
 static inline long calc_tg_weight(struct task_group *tg, struct cfs_rq *cfs_rq)
 {
         long tg_weight;
@@ -1403,6 +1429,81 @@ static inline void update_cfs_shares(struct cfs_rq *cfs_rq)
 {
 }
 #endif /* CONFIG_FAIR_GROUP_SCHED */
+
+#ifdef CONFIG_SCHED_HMP
+
+
+/*
+ * Migration thresholds should be in the range [0..1023]
+ * hmp_up_threshold: min. load required for migrating tasks to a faster cpu
+ * hmp_down_threshold: max. load allowed for tasks migrating to a slower cpu
+ *
+ * hmp_up_prio: Only up migrate task with high priority (<hmp_up_prio)
+ * hmp_next_up_threshold: Delay before next up migration (1024 ~= 1 ms)
+ * hmp_next_down_threshold: Delay before next down migration (1024 ~= 1 ms)
+ *
+ * Small Task Packing:
+ * We can choose to fill the littlest CPUs in an HMP system rather than
+ * the typical spreading mechanic. This behavior is controllable using
+ * two variables.
+ * hmp_packing_enabled: runtime control over pack/spread
+ * hmp_full_threshold: Consider a CPU with this much unweighted load full
+ */
+#ifdef CONFIG_HMP_DYNAMIC_THRESHOLD
+unsigned int hmp_up_threshold = 1023;
+unsigned int hmp_down_threshold = 0;
+#else
+//unsigned int hmp_up_threshold = 512;
+//unsigned int hmp_down_threshold = 256;
+unsigned int hmp_up_threshold = 700;
+unsigned int hmp_down_threshold = 512;
+#endif
+
+
+#ifdef CONFIG_SCHED_HMP_PRIO_FILTER
+unsigned int hmp_up_prio = NICE_TO_PRIO(CONFIG_SCHED_HMP_PRIO_FILTER_VAL);
+#endif
+unsigned int hmp_next_up_threshold = 4096;
+unsigned int hmp_next_down_threshold = 4096;
+
+
+
+
+#ifdef CONFIG_SCHED_HMP_ENHANCEMENT
+
+/* Schedule entity */
+#define se_pid(se) ((se != NULL && entity_is_task(se)) ? \
+                        container_of(se, struct task_struct, se)->pid : -1)
+#define se_load(se) se->avg.load_avg_ratio
+#define se_contrib(se) se->avg.load_avg_contrib
+
+/* CPU related : load information */
+#define cfs_pending_load(cpu) rq_of(cpu)->cfs.avg.pending_load
+#define cfs_load(cpu) rq_of(cpu)->cfs.avg.load_avg_ratio
+#define cfs_contrib(cpu) rq_of(cpu)->cfs.avg.load_avg_contrib
+
+/* CPU related : the number of tasks */
+#define cfs_nr_normal_prio(cpu) cpu_rq(cpu)->cfs.avg.nr_normal_prio
+//#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 10, 100)
+#define cfs_nr_pending(cpu) cpu_rq(cpu)->cfs.avg.nr_pending
+#define cfs_length(cpu) cpu_rq(cpu)->cfs.h_nr_running
+#define rq_length(cpu) (cpu_rq(cpu)->nr_running + cfs_nr_pending(cpu))
+
+#ifdef CONFIG_SCHED_HMP_PRIO_FILTER
+#define task_low_priority(prio) ((prio >= hmp_up_prio)?1:0)
+#define cfs_nr_dequeuing_low_prio(cpu) \
+                        cpu_rq(cpu)->cfs.avg.nr_dequeuing_low_prio
+#define cfs_reset_nr_dequeuing_low_prio(cpu) \
+                        (cfs_nr_dequeuing_low_prio(cpu) = 0)
+#else
+#define task_low_priority(prio)                 (0)
+#define cfs_reset_nr_dequeuing_low_prio(cpu)    /*      NOP     */
+#endif /* CONFIG_SCHED_HMP_PRIO_FILTER */
+
+#endif /* CONFIG_SCHED_HMP_ENHANCEMENT */
+
+
+#endif  /*      CONFIG_SCHED_HMP        */
 
 /* Only depends on SMP, FAIR_GROUP_SCHED may be removed when useful in lb */
 #if defined(CONFIG_SMP) && defined(CONFIG_FAIR_GROUP_SCHED)
@@ -2005,7 +2106,7 @@ static inline void __update_task_entity_contrib(struct sched_entity *se)
         se->avg.load_avg_ratio = scale_load(contrib);
         trace_sched_task_runnable_ratio(task_of(se), se->avg.load_avg_ratio);
 */
-        }
+}
 
 /* Compute the current contribution to load_avg by se, return any delta */
 static long __update_entity_load_avg_contrib(struct sched_entity *se, long *ratio)
@@ -2082,8 +2183,7 @@ static inline void update_entity_load_avg(struct sched_entity *se,
 
         contrib_delta = __update_entity_load_avg_contrib(se, &ratio_delta);
 #ifdef CONFIG_SCHED_HMP_ENHANCEMENT
-        if()entity_is_task(se) {
-        {
+        if(entity_is_task(se)) {
                 ratio_delta = __update_task_entity_ratio(se);
 
                 /* ratio is re-estimated just for entity of task; as
@@ -2168,6 +2268,9 @@ static inline void enqueue_entity_load_avg(struct cfs_rq *cfs_rq,
                                                   struct sched_entity *se,
                                                   int wakeup)
 {
+#ifdef CONFIG_SCHED_HMP_ENHANCEMENT
+        int cpu = cfs_rq->rq->cpu;
+#endif
         /*
          * We track migrations using entity decay_count <= 0, on a wake-up
          * migration we use a negative decay count to track the remote decays
@@ -2228,6 +2331,10 @@ static inline void dequeue_entity_load_avg(struct cfs_rq *cfs_rq,
                                                   struct sched_entity *se,
                                                   int sleep)
 {
+#ifdef CONFIG_SCHED_HMP_PRIO_FILTER
+        int cpu = cfs_rq->rq->cpu;
+#endif  /*      #ifdef CONFIG_SCHED_HMP_PRIO_FILTER     */
+
         update_entity_load_avg(se, 1);
         /* we force update consideration on load-balancer moves */
         update_cfs_rq_blocked_load(cfs_rq, !sleep);
@@ -4465,6 +4572,9 @@ static inline unsigned int hmp_cpu_is_slowest(int cpu);
 static inline struct hmp_domain *hmp_slower_domain(int cpu);
 static inline struct hmp_domain *hmp_faster_domain(int cpu);
 
+
+#ifndef  CONFIG_SCHED_HMP_ENHANCEMENT   /*      #if 0   #endif */
+
 /* must hold runqueue lock for queue se is currently on
  * 查找并返回CPU(target_cpu)上最繁忙的进程,
  *
@@ -4568,70 +4678,49 @@ static struct sched_entity *hmp_get_lightest_task(
         return min_se;
 }
 
+
 /*
- * Migration thresholds should be in the range [0..1023]
- * hmp_up_threshold: min. load required for migrating tasks to a faster cpu
- * hmp_down_threshold: max. load allowed for tasks migrating to a slower cpu
- *
- * hmp_up_prio: Only up migrate task with high priority (<hmp_up_prio)
- * hmp_next_up_threshold: Delay before next up migration (1024 ~= 1 ms)
- * hmp_next_down_threshold: Delay before next down migration (1024 ~= 1 ms)
- *
- * Small Task Packing:
- * We can choose to fill the littlest CPUs in an HMP system rather than
- * the typical spreading mechanic. This behavior is controllable using
- * two variables.
- * hmp_packing_enabled: runtime control over pack/spread
- * hmp_full_threshold: Consider a CPU with this much unweighted load full
+ * Select the 'best' candidate little CPU to wake up on.
+ * Implements a packing strategy which examines CPU in
+ * logical CPU order, and selects the first which will
+ * be loaded less than hmp_full_threshold according to
+ * the sum of the tracked load of the runqueue and the task.
  */
-#ifdef CONFIG_HMP_DYNAMIC_THRESHOLD
-unsigned int hmp_up_threshold = 1023;
-unsigned int hmp_down_threshold = 0;
-#else
-//unsigned int hmp_up_threshold = 512;
-//unsigned int hmp_down_threshold = 256;
-unsigned int hmp_up_threshold = 700;
-unsigned int hmp_down_threshold = 512;
-#endif
+static inline unsigned int hmp_best_little_cpu(struct task_struct *tsk,
+                int cpu) {
+        int tmp_cpu;
+        unsigned long estimated_load;
+        struct hmp_domain *hmp;
+        struct sched_avg *avg;
+        struct cpumask allowed_hmp_cpus;
 
+        if(!hmp_packing_enabled ||
+                        tsk->se.avg.load_avg_ratio > ((NICE_0_LOAD * 90)/100))
+                return hmp_select_slower_cpu(tsk, cpu);
 
-#ifdef CONFIG_SCHED_HMP_PRIO_FILTER
-unsigned int hmp_up_prio = NICE_TO_PRIO(CONFIG_SCHED_HMP_PRIO_FILTER_VAL);
-#endif
-unsigned int hmp_next_up_threshold = 4096;
-unsigned int hmp_next_down_threshold = 4096;
+        if (hmp_cpu_is_slowest(cpu))
+                hmp = hmp_cpu_domain(cpu);
+        else
+                hmp = hmp_slower_domain(cpu);
 
+        /* respect affinity */
+        cpumask_and(&allowed_hmp_cpus, &hmp->cpus,
+                        tsk_cpus_allowed(tsk));
 
-#ifdef CONFIG_SCHED_HMP_ENHANCEMENT
-/* Schedule entity */
-#define se_pid(se) ((se != NULL && entity_is_task(se)) ? \
-                        container_of(se, struct task_struct, se)->pid : -1)
-#define se_load(se) se->avg.load_avg_ratio
-#define se_contrib(se) se->avg.load_avg_contrib
-
-/* CPU related : load information */
-#define cfs_pending_load(cpu) rq_of(cpu)->cfs.avg.pending_load
-#define cfs_load(cpu) rq_of(cpu)->cfs.avg.load_avg_ratio
-#define cfs_contrib(cpu) rq_of(cpu)->cfs.avg.load_avg_contrib
-
-/* CPU related : the number of tasks */
-#define cfs_nr_normal_prio(cpu) cpu_rq(cpu)->cfs.avg.nr_normal_prio
-//#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 10, 100)
-#define cfs_nr_pending(cpu) cpu_rq(cpu)->cfs.avg.nr_pending
-#define cfs_length(cpu) cpu_rq(cpu)->cfs.h_nr_running
-#define rq_length(cpu) (cpu_rq(cpu)->nr_running + cfs_nr_pending(cpu))
-
-#ifdef CONFIG_SCHED_HMP_PRIO_FILTER
-#define task_low_priority(prio) ((prio >= hmp_up_prio)?1:0)
-#define cfs_nr_dequeuing_low_prio(cpu) \
-                        cpu_rq(cpu)->cfs.avg.nr_dequeuing_low_prio
-#define cfs_reset_nr_dequeuing_low_prio(cpu) \
-                        (cfs_nr_dequeuing_low_prio(cpu) = 0)
-#else
-#define task_low_priority(prio)                 (0)
-#define cfs_reset_nr_dequeuing_low_prio(cpu)    /*      NOP     */
-#endif /* CONFIG_SCHED_HMP_PRIO_FILTER */
-#endif /* CONFIG_SCHED_HMP_ENHANCEMENT */
+        for_each_cpu_mask(tmp_cpu, allowed_hmp_cpus) {
+                avg = &cpu_rq(tmp_cpu)->avg;
+                /* estimate new rq load if we add this task */
+                estimated_load = avg->load_avg_ratio +
+                                tsk->se.avg.load_avg_ratio;
+                if (estimated_load <= hmp_full_threshold) {
+                        cpu = tmp_cpu;
+                        break;
+                }
+        }
+        /* if no match was found, the task uses the initial value */
+        return cpu;
+}
+#endif /* #ifndef  CONFIG_SCHED_HMP_ENHANCEMENT */
 
 
 #ifdef CONFIG_SCHED_HMP_LITTLE_PACKING
@@ -4678,6 +4767,8 @@ static int hmp_select_task_rq_fair(int sd_flag, struct task_struct *p,
 static unsigned int hmp_up_migration(int cpu, int *target_cpu, struct sched_entity *se);
 static unsigned int hmp_down_migration(int cpu, struct sched_entity *se);
 #endif
+
+
 static inline unsigned int hmp_domain_min_load(struct hmp_domain *hmpd,
                                                 int *min_cpu, struct cpumask *affinity);
 
@@ -4733,7 +4824,7 @@ static inline unsigned int hmp_select_faster_cpu(struct task_struct *tsk,
                                                         int cpu)
 {
         int lowest_cpu = NR_CPUS;
-        __always_unused int lowest_ratio = hmp_domain_min_load(hmp_faster_domain(cpu), &lowest_cpu);
+        __always_unused int lowest_ratio = hmp_domain_min_load(hmp_faster_domain(cpu), &lowest_cpu, NULL);
         /*
          * If the lowest-loaded CPU in the domain is allowed by the task affinity
          * select that one, otherwise select one which is allowed
@@ -4753,7 +4844,7 @@ static inline unsigned int hmp_select_slower_cpu(struct task_struct *tsk,
                                                         int cpu)
 {
         int lowest_cpu = NR_CPUS;
-        __always_unused int lowest_ratio = hmp_domain_min_load(hmp_slower_domain(cpu), &lowest_cpu);
+        __always_unused int lowest_ratio = hmp_domain_min_load(hmp_slower_domain(cpu), &lowest_cpu, NULL);
         /*
          * If the lowest-loaded CPU in the domain is allowed by the task affinity
          * select that one, otherwise select one which is allowed
@@ -4766,7 +4857,7 @@ static inline unsigned int hmp_select_slower_cpu(struct task_struct *tsk,
 }
 
 
-#else
+#else       /*  CONFIG_SCHED_HMP_ENHANCEMENT    */
 
 /*
  * Selects a cpu in previous (faster) hmp_domain
@@ -4811,7 +4902,7 @@ static inline unsigned int hmp_select_slower_cpu(struct task_struct *tsk,
         return lowest_cpu;
 }
 
-#endif
+#endif  /*  CONFIG_SCHED_HMP_ENHANCEMENT    */
 
 
 
@@ -4834,51 +4925,6 @@ static inline void hmp_next_down_delay(struct sched_entity *se, int cpu)
         cpu_rq(cpu)->avg.hmp_last_down_migration = now;
         cpu_rq(cpu)->avg.hmp_last_up_migration = 0;
 }
-
-
-#ifdef CONFIG_SCHED_HMP_LITTLE_PACKING
-/*
- * Select the 'best' candidate little CPU to wake up on.
- * Implements a packing strategy which examines CPU in
- * logical CPU order, and selects the first which will
- * be loaded less than hmp_full_threshold according to
- * the sum of the tracked load of the runqueue and the task.
- */
-static inline unsigned int hmp_best_little_cpu(struct task_struct *tsk,
-                int cpu) {
-        int tmp_cpu;
-        unsigned long estimated_load;
-        struct hmp_domain *hmp;
-        struct sched_avg *avg;
-        struct cpumask allowed_hmp_cpus;
-
-        if(!hmp_packing_enabled ||
-                        tsk->se.avg.load_avg_ratio > ((NICE_0_LOAD * 90)/100))
-                return hmp_select_slower_cpu(tsk, cpu);
-
-        if (hmp_cpu_is_slowest(cpu))
-                hmp = hmp_cpu_domain(cpu);
-        else
-                hmp = hmp_slower_domain(cpu);
-
-        /* respect affinity */
-        cpumask_and(&allowed_hmp_cpus, &hmp->cpus,
-                        tsk_cpus_allowed(tsk));
-
-        for_each_cpu_mask(tmp_cpu, allowed_hmp_cpus) {
-                avg = &cpu_rq(tmp_cpu)->avg;
-                /* estimate new rq load if we add this task */
-                estimated_load = avg->load_avg_ratio +
-                                tsk->se.avg.load_avg_ratio;
-                if (estimated_load <= hmp_full_threshold) {
-                        cpu = tmp_cpu;
-                        break;
-                }
-        }
-        /* if no match was found, the task uses the initial value */
-        return cpu;
-}
-#endif
 
 
 
@@ -5590,7 +5636,7 @@ migrate_task_rq_fair(struct task_struct *p, int next_cpu)
                 atomic64_add(se->avg.load_avg_contrib, &cfs_rq->removed_load);
         }
 }
-#endif  /*      CONFIG_SCHED_HMP_ENHANCEMENT     */
+//#endif  /*      CONFIG_SCHED_HMP_ENHANCEMENT     */
 #endif /* CONFIG_SMP */
 
 static unsigned long
@@ -5842,7 +5888,6 @@ static bool yield_to_task_fair(struct rq *rq, struct task_struct *p, bool preemp
 }
 
 
- #define CONFIG_SMP
 #ifdef CONFIG_SMP
 /**************************************************
  * Fair scheduling class load-balancing methods.
@@ -8246,9 +8291,29 @@ need_kick:
 static void nohz_idle_balance(int this_cpu, enum cpu_idle_type idle) { }
 #endif  /*      CONFIG_NO_HZ_COMMON     */
 
+
+
+static DEFINE_SPINLOCK(hmp_force_migration);
+
+
+
 //////////////////////////////////
-///      #ifdef  CONFIG_SCHED_HMP
+#ifdef  CONFIG_SCHED_HMP
 //////////////////////////////////
+/*
+ * hmp_active_task_migration_cpu_stop is run by cpu stopper and used to
+ * migrate a specific task from one runqueue to another.
+ * hmp_force_up_migration uses this to push a currently running task
+ * off a runqueue. hmp_idle_pull uses this to pull a currently
+ * running task to an idle runqueue.
+ * Reuses __do_active_load_balance_cpu_stop to actually do the work.
+ */
+static int hmp_active_task_migration_cpu_stop(void *data)
+{
+        return __do_active_load_balance_cpu_stop(data, false);
+}
+
+
 
 #ifdef CONFIG_SCHED_HMP_ENHANCEMENT     /*      &&      defined(CONFIG_SCHED_HMP)       */
 
@@ -8981,8 +9046,21 @@ out_force_up:
 }
 
 
+/*
+ * hmp_idle_pull looks at little domain runqueues to see
+ * if a task should be pulled.
+ *
+ * Reuses hmp_force_migration spinlock.
+ *
+ */
+static unsigned int hmp_idle_pull(int this_cpu)
+{
+    //  need rewrite
+    return -1;
+}
 
-#elif   defined(CONFIG_SCHED_HMP)   /*  && !defined(CONFIG_SCHED_HMP__ENHANCEMENT)
+
+#elif   defined(CONFIG_SCHED_HMP)   /*  && !defined(CONFIG_SCHED_HMP__ENHANCEMENT)      */
 
 /*  判断进程实体 se 的平均负载是否高于 hmp_up_threshold 这个阀值
  *  hmp_up_threshold 也是一个过滤作用
@@ -9201,18 +9279,6 @@ static int move_specific_task(struct lb_env *env, struct task_struct *pm)
         return 0;
 }
 
-/*
- * hmp_active_task_migration_cpu_stop is run by cpu stopper and used to
- * migrate a specific task from one runqueue to another.
- * hmp_force_up_migration uses this to push a currently running task
- * off a runqueue. hmp_idle_pull uses this to pull a currently
- * running task to an idle runqueue.
- * Reuses __do_active_load_balance_cpu_stop to actually do the work.
- */
-static int hmp_active_task_migration_cpu_stop(void *data)
-{
-        return __do_active_load_balance_cpu_stop(data, false);
-}
 
 /*
  * Move task in a runnable state to another CPU.
@@ -9291,7 +9357,6 @@ out:
         put_task_struct(p);
 }
 
-static DEFINE_SPINLOCK(hmp_force_migration);
 
 /*
  * hmp_force_up_migration checks runqueues for tasks that need to
@@ -9444,9 +9509,7 @@ static void hmp_force_up_migration(int this_cpu)
         }
         spin_unlock(&hmp_force_migration);
 }
-#else   /* CONFIG_SCHED_HMP_ENHANCEMENT */
-static void hmp_force_up_migration(int this_cpu) { }
-#endif /* CONFIG_SCHED_HMP_ENHANCEMENT */
+
 
 /*
  * hmp_idle_pull looks at little domain runqueues to see
@@ -9553,6 +9616,12 @@ done:
         return force;
 }
 
+#else   /* CONFIG_SCHED_HMP_ENHANCEMENT */
+static void hmp_force_up_migration(int this_cpu) { }
+#endif /* CONFIG_SCHED_HMP_ENHANCEMENT */
+
+
+
 /*
  * run_rebalance_domains is triggered when needed from the scheduler tick.
  * Also triggered for nohz idle balancing (with nohz_balancing_kick set).
@@ -9636,7 +9705,7 @@ static void rq_offline_fair(struct rq *rq)
 }
 
 //////////////////////////////////
-///      endif  CONFIG_SCHED_HMP
+#endif  CONFIG_SCHED_HMP
 //////////////////////////////////
 
 #endif /* CONFIG_SMP */

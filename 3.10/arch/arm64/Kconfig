@@ -385,6 +385,13 @@ config HMP_PACK_BUDDY_INFO
 	help
 		This option enables Packing Small Tasks Buddy Information Log
 
+config HMP_PACK_STOP_MACHINE
+        bool "(EXPERIMENTAL) Packing HMP-stop machine"
+        depends on SCHED_HMP_ENHANCEMENT
+        help
+                This option enables Packing stop machine at the time of need
+                add by gatieme(ChengJean) @ 2012-12-03 22:16
+
 config HMP_LAZY_BALANCE
 	bool "(EXPERIMENTAL) Lazy Balance"
 	depends on SCHED_HMP_ENHANCEMENT && HMP_PACK_SMALL_TASK

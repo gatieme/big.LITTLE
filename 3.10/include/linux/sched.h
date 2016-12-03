@@ -785,6 +785,11 @@ enum cpu_idle_type {
 #define SD_PREFER_SIBLING	0x1000	/* Prefer to place tasks in a sibling domain */
 #define SD_OVERLAP		0x2000	/* sched_domains of this level overlap */
 
+
+#ifdef CONFIG_HMP_PACK_SMALL_TASK
+#define SD_SHARE_POWERLINE	0x0100	/* Domain members share power domain */
+#endif /* CONFIG_HMP_PACK_SMALL_TASK */
+
 extern int __weak arch_sd_sibiling_asym_packing(void);
 
 struct sched_domain_attr {
@@ -892,6 +897,8 @@ void free_sched_domains(cpumask_var_t doms[], unsigned int ndoms);
 bool cpus_share_cache(int this_cpu, int that_cpu);
 
 #ifdef CONFIG_SCHED_HMP
+
+
 /*  HMP 调度器重新定义了 domain 的实现,
  *  定义了 struct hmp_domain 数据结构(include/linux/sched.h)
  *  该结构比较简单, cpus 和 possible_cpus 两个 cpumask 变量以及一个链表节点.
@@ -907,6 +914,26 @@ struct hmp_domain {
 };
 
 #ifdef CONFIG_SCHED_HMP_ENHANCEMENT
+
+//#ifdef CONFIG_HMP_DYNAMIC_THRESHOLD
+struct clb_stats {
+	int ncpu;                     /* The number of CPU */
+	int ntask;                    /* The number of tasks */
+	int load_avg;                 /* Arithmetic average of task load ratio */
+	int cpu_capacity;             /* Current CPU capacity */
+        int cpu_power;                /* Max CPU capacity */
+	int acap;                     /* Available CPU capacity */
+	int scaled_acap;              /* Scaled available CPU capacity */
+	int scaled_atask;             /* Scaled available task */
+	int threshold;                /* Dynamic threshold */
+#ifdef CONFIG_SCHED_HMP_PRIO_FILTER
+	int nr_normal_prio_task;      /* The number of normal-prio tasks */
+	int nr_dequeuing_low_prio;    /* The number of dequeuing low-prio tasks */
+#endif
+};
+//      #endif  /*      #ifdef CONFIG_HMP_DYNAMIC_THRESHOLD     */
+
+
 #ifdef CONFIG_HMP_TRACER
 struct hmp_statisic {
         unsigned int nr_force_up;   /* The number of task force up-migration */

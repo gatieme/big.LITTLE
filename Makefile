@@ -2,7 +2,7 @@ all	: github
 .PHONY	: github
 
 
-GITHUB_COMMIT	:=	"完善了统计信息sched_avg, 并修复了kernel/sched/fair.c中条件宏匹配的问题, 同时更改了部分文件的编码cp936-=>utf-8..."
+GITHUB_COMMIT	:=	"改进了HMP负载均衡调度器..."
 
 github	:
 	git pull
