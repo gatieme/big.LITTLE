@@ -249,11 +249,11 @@ void update_packing_domain(int cpu)
         struct sched_group *tmp = sg->next;
 
 #ifdef CONFIG_HMP_PACK_BUDDY_INFO
-        pr_debug("[PACK]  sd = 0x%08x, flags = %d\n", (unsigned int)sd, sd->flags);
+        pr_debug("[PACK]  sd = 0x%08lx, flags = %d\n", (unsigned long)sd, sd->flags);
 #endif /* CONFIG_HMP_PACK_BUDDY_INFO */
 
 #ifdef CONFIG_HMP_PACK_BUDDY_INFO
-        pr_debug("[PACK]  sg = 0x%08x\n", (unsigned int)sg);
+        pr_debug("[PACK]  sg = 0x%08lx\n", (unsigned long)sg);
 #endif /* CONFIG_HMP_PACK_BUDDY_INFO */
 
         /* 1st CPU of the sched domain is a good candidate */
@@ -274,7 +274,7 @@ void update_packing_domain(int cpu)
         } while (tmp = tmp->next, tmp != sd->groups);
 
 #ifdef CONFIG_HMP_PACK_BUDDY_INFO
-        pr_debug("[PACK]  pack = 0x%08x\n", (unsigned int)sg);
+        pr_debug("[PACK]  pack = 0x%08lx\n", (unsigned long)sg);
 #endif /* CONFIG_HMP_PACK_BUDDY_INFO */
 
         pack = sg;
@@ -309,12 +309,12 @@ void update_packing_domain(int cpu)
 
 #ifdef CONFIG_HMP_PACK_BUDDY_INFO
         if (sd->parent) {
-            pr_debug("[PACK]  cpu = %d, id = %d, sd->parent = 0x%08x, flags = %d, SD_LOAD_BALANCE = %d\n", cpu, id, (unsigned int)sd->parent, sd->parent->flags, SD_LOAD_BALANCE);
+            pr_debug("[PACK]  cpu = %d, id = %d, sd->parent = 0x%08lx, flags = %d, SD_LOAD_BALANCE = %d\n", cpu, id, (unsigned long)sd->parent, sd->parent->flags, SD_LOAD_BALANCE);
             pr_debug("[PACK]  %d\n", (id != cpu));
-            pr_debug("[PACK]  0x%08x\n", (unsigned int)(sd->parent));
+            pr_debug("[PACK]  0x%08lx\n", (unsigned long)(sd->parent));
             pr_debug("[PACK]  %d\n", (sd->parent->flags & SD_LOAD_BALANCE));
         } else {
-            pr_debug("[PACK]  cpu = %d, id = %d, sd->parent = 0x%08x\n", cpu, id, (unsigned int)sd->parent);
+            pr_debug("[PACK]  cpu = %d, id = %d, sd->parent = 0x%08lx\n", cpu, id, (unsigned long)sd->parent);
         }
 #endif /* CONFIG_HMP_PACK_BUDDY_INFO */
 
@@ -1478,9 +1478,9 @@ unsigned int hmp_next_down_threshold = 4096;
 #define se_contrib(se) se->avg.load_avg_contrib
 
 /* CPU related : load information */
-#define cfs_pending_load(cpu) rq_of(cpu)->cfs.avg.pending_load
-#define cfs_load(cpu) rq_of(cpu)->cfs.avg.load_avg_ratio
-#define cfs_contrib(cpu) rq_of(cpu)->cfs.avg.load_avg_contrib
+#define cfs_pending_load(cpu) cpu_rq(cpu)->cfs.avg.pending_load
+#define cfs_load(cpu) cpu_rq(cpu)->cfs.avg.load_avg_ratio
+#define cfs_contrib(cpu) cpu_rq(cpu)->cfs.avg.load_avg_contrib
 
 /* CPU related : the number of tasks */
 #define cfs_nr_normal_prio(cpu) cpu_rq(cpu)->cfs.avg.nr_normal_prio
@@ -5360,7 +5360,9 @@ select_task_rq_fair(struct task_struct *p, int sd_flag, int wake_flags)
 #ifdef CONFIG_MTK_SCHED_TRACERS
         int policy = 0;
 #endif
+#if 0
         int prefer_cpu;
+#endif
 #ifdef CONFIG_MTK_SCHED_CMP_PACK_SMALL_TASK
         int buddy_cpu = per_cpu(sd_pack_buddy, cpu);
 #endif
@@ -5440,16 +5442,48 @@ select_task_rq_fair(struct task_struct *p, int sd_flag, int wake_flags)
         }
 #endif                          /* CONFIG_HMP_PACK_SMALL_TASK */
 
-#ifdef CONFIG_SCHED_HMP
+#ifdef CONFIG_SCHED_HMP /*      此处有较多疑问, 待解决  */
         /* always put non-kernel forking tasks on a big domain */
-        if (unlikely(sd_flag & SD_BALANCE_FORK) && hmp_task_should_forkboost(p)) {  /*  对于新创建的进程并且该进程是用户进程    */
-                new_cpu = hmp_select_faster_cpu(p, prev_cpu);
-                if (new_cpu != NR_CPUS) {
-                        hmp_next_up_delay(&p->se, new_cpu);
-                        return new_cpu;
+        if (p->mm && unlikely(sd_flag & SD_BALANCE_FORK) && hmp_task_should_forkboost(p)) {  /*  对于新创建的进程并且该进程是用户进程    */
+                if (hmp_cpu_is_fastest(prev_cpu)) {
+                        struct hmp_domain *hmpdom = list_entry(&hmp_cpu_domain(prev_cpu)->hmp_domains, struct hmp_domain, hmp_domains);
+                        __always_unused int lowest_ratio = hmp_domain_min_load(hmpdom, &new_cpu, NULL);
+                        if (new_cpu < nr_cpu_ids && cpumask_test_cpu(new_cpu, tsk_cpus_allowed(p))) {
+#ifdef CONFIG_MTK_SCHED_TRACERS
+
+                                trace_sched_select_task_rq(p, (LB_FORK | new_cpu), prev_cpu, new_cpu);
+#endif
+                                return new_cpu;
+
+                        } else {
+                                new_cpu = cpumask_any_and(&hmp_faster_domain(cpu)->cpus,
+                                                        tsk_cpus_allowed(p));
+                                if (new_cpu < nr_cpu_ids) {
+#ifdef CONFIG_MTK_SCHED_TRACERS
+
+                                        trace_sched_select_task_rq(p, (LB_FORK | new_cpu), prev_cpu, new_cpu);
+#endif
+
+                                        return new_cpu;
+                                }
+
+                        }
+                } else {
+                        new_cpu = hmp_select_faster_cpu(p, prev_cpu);
+                        if (new_cpu != NR_CPUS/* new_cpu < nr_cpu_ids */) {
+#ifdef CONFIG_MTK_SCHED_TRACERS
+
+                                trace_sched_select_task_rq(p, (LB_FORK | new_cpu), prev_cpu, new_cpu);
+#endif
+                                hmp_next_up_delay(&p->se, new_cpu);
+                                return new_cpu;
+                        }
                 }
+
+                /* to recover new_cpu value */
                 /* failed to perform HMP fork balance, use normal balance */
-                new_cpu = cpu;
+                if (new_cpu >= nr_cpu_ids)
+                        new_cpu = cpu;
         }
 #endif
 
@@ -5458,6 +5492,24 @@ select_task_rq_fair(struct task_struct *p, int sd_flag, int wake_flags)
                         want_affine = 1;
                 new_cpu = prev_cpu;
         }
+#if 0
+
+#ifdef CONFIG_SCHED_HMP_ENHANCEMENT
+        prefer_cpu = mt_select_task_rq_fair(p, prev_cpu);
+                if (prefer_cpu < nr_cpu_ids) {
+                                cpu = prefer_cpu;
+                                new_cpu = prefer_cpu;
+#ifdef CONFIG_MTK_SCHED_TRACERS
+                                policy |= (new_cpu << LB_CMP_SHIFT);
+                                policy |= LB_CMP;
+#endif  /*      #ifdef CONFIG_MTK_SCHED_TRACERS */
+                                mt_sched_printf(sched_log, "cmp/interop wakeup %d %s to cpu %d",
+                                                                                p->pid, p->comm, cpu);
+                                goto mt_found;
+                        }
+#endif  /*      #ifdef CONFIG_SCHED_HMP_ENHANCEMENT     */
+#endif
+
 
         rcu_read_lock();
         for_each_domain(cpu, tmp) {
@@ -8297,9 +8349,16 @@ static DEFINE_SPINLOCK(hmp_force_migration);
 
 
 
-//////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 #ifdef  CONFIG_SCHED_HMP
-//////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+
+/////////////////////
+// common functions for HMP and CONFIG_SCHED_HMP_ENHANCEMENT
+/////////////////////
+
+
 /*
  * hmp_active_task_migration_cpu_stop is run by cpu stopper and used to
  * migrate a specific task from one runqueue to another.
@@ -8312,6 +8371,91 @@ static int hmp_active_task_migration_cpu_stop(void *data)
 {
         return __do_active_load_balance_cpu_stop(data, false);
 }
+
+
+/*
+ * hmp_can_migrate_task - may task p from runqueue rq be migrated to this_cpu?
+ * Ideally this function should be merged with can_migrate_task() to avoid
+ * redundant code.
+ */
+static int hmp_can_migrate_task(struct task_struct *p, struct lb_env *env)
+{
+        int tsk_cache_hot = 0;
+
+        /*
+         * We do not migrate tasks that are:
+         * 1) running (obviously), or
+         * 2) cannot be migrated to this CPU due to cpus_allowed
+         */
+        if (!cpumask_test_cpu(env->dst_cpu, tsk_cpus_allowed(p))) {
+                schedstat_inc(p, se.statistics.nr_failed_migrations_affine);
+                return 0;
+        }
+        env->flags &= ~LBF_ALL_PINNED;
+
+        if (task_running(env->src_rq, p)) {
+                schedstat_inc(p, se.statistics.nr_failed_migrations_running);
+                return 0;
+        }
+
+        /*
+         * Aggressive migration if:
+         * 1) task is cache cold, or
+         * 2) too many balance attempts have failed.
+         */
+
+#if defined(CONFIG_MT_LOAD_BALANCE_ENHANCEMENT)
+        tsk_cache_hot = task_hot(p, env->src_rq->clock_task, env->sd, env->mt_check_cache_in_idle);
+#else
+        tsk_cache_hot = task_hot(p, env->src_rq->clock_task, env->sd);
+#endif
+        if (!tsk_cache_hot ||
+                env->sd->nr_balance_failed > env->sd->cache_nice_tries) {
+#ifdef CONFIG_SCHEDSTATS
+                if (tsk_cache_hot) {
+                        schedstat_inc(env->sd, lb_hot_gained[env->idle]);
+                        schedstat_inc(p, se.statistics.nr_forced_migrations);
+                }
+#endif
+                return 1;
+        }
+
+        return 1;
+}
+
+
+/*
+ * move_specific_task tries to move a specific task.
+ * Returns 1 if successful and 0 otherwise.
+ * Called with both runqueues locked.
+ */
+static int move_specific_task(struct lb_env *env, struct task_struct *pm)
+{
+        struct task_struct *p, *n;
+
+        list_for_each_entry_safe(p, n, &env->src_rq->cfs_tasks, se.group_node) {
+        if (throttled_lb_pair(task_group(p), env->src_rq->cpu,
+                                env->dst_cpu))
+                continue;
+
+                if (!hmp_can_migrate_task(p, env))
+                        continue;
+                /* Check if we found the right task */
+                if (p != pm)
+                        continue;
+
+                move_task(p, env);
+                /*
+                 * Right now, this is only the third place move_task()
+                 * is called, so we can safely collect move_task()
+                 * stats here rather than inside move_task().
+                 */
+                schedstat_inc(env->sd, lb_gained[env->idle]);
+                return 1;
+        }
+        return 0;
+}
+
 
 
 
@@ -9197,88 +9341,6 @@ static unsigned int hmp_down_migration(int cpu, struct sched_entity *se)
         return 0;
 }
 
-/*
- * hmp_can_migrate_task - may task p from runqueue rq be migrated to this_cpu?
- * Ideally this function should be merged with can_migrate_task() to avoid
- * redundant code.
- */
-static int hmp_can_migrate_task(struct task_struct *p, struct lb_env *env)
-{
-        int tsk_cache_hot = 0;
-
-        /*
-         * We do not migrate tasks that are:
-         * 1) running (obviously), or
-         * 2) cannot be migrated to this CPU due to cpus_allowed
-         */
-        if (!cpumask_test_cpu(env->dst_cpu, tsk_cpus_allowed(p))) {
-                schedstat_inc(p, se.statistics.nr_failed_migrations_affine);
-                return 0;
-        }
-        env->flags &= ~LBF_ALL_PINNED;
-
-        if (task_running(env->src_rq, p)) {
-                schedstat_inc(p, se.statistics.nr_failed_migrations_running);
-                return 0;
-        }
-
-        /*
-         * Aggressive migration if:
-         * 1) task is cache cold, or
-         * 2) too many balance attempts have failed.
-         */
-
-#if defined(CONFIG_MT_LOAD_BALANCE_ENHANCEMENT)
-        tsk_cache_hot = task_hot(p, env->src_rq->clock_task, env->sd, env->mt_check_cache_in_idle);
-#else
-        tsk_cache_hot = task_hot(p, env->src_rq->clock_task, env->sd);
-#endif
-        if (!tsk_cache_hot ||
-                env->sd->nr_balance_failed > env->sd->cache_nice_tries) {
-#ifdef CONFIG_SCHEDSTATS
-                if (tsk_cache_hot) {
-                        schedstat_inc(env->sd, lb_hot_gained[env->idle]);
-                        schedstat_inc(p, se.statistics.nr_forced_migrations);
-                }
-#endif
-                return 1;
-        }
-
-        return 1;
-}
-
-/*
- * move_specific_task tries to move a specific task.
- * Returns 1 if successful and 0 otherwise.
- * Called with both runqueues locked.
- */
-static int move_specific_task(struct lb_env *env, struct task_struct *pm)
-{
-        struct task_struct *p, *n;
-
-        list_for_each_entry_safe(p, n, &env->src_rq->cfs_tasks, se.group_node) {
-        if (throttled_lb_pair(task_group(p), env->src_rq->cpu,
-                                env->dst_cpu))
-                continue;
-
-                if (!hmp_can_migrate_task(p, env))
-                        continue;
-                /* Check if we found the right task */
-                if (p != pm)
-                        continue;
-
-                move_task(p, env);
-                /*
-                 * Right now, this is only the third place move_task()
-                 * is called, so we can safely collect move_task()
-                 * stats here rather than inside move_task().
-                 */
-                schedstat_inc(env->sd, lb_gained[env->idle]);
-                return 1;
-        }
-        return 0;
-}
-
 
 /*
  * Move task in a runnable state to another CPU.
@@ -9704,9 +9766,9 @@ static void rq_offline_fair(struct rq *rq)
         unthrottle_offline_cfs_rqs(rq);
 }
 
-//////////////////////////////////
-#endif  CONFIG_SCHED_HMP
-//////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+#endif  /*      CONFIG_SCHED_HMP        */
+////////////////////////////////////////////////////////////////////////////////
 
 #endif /* CONFIG_SMP */
 

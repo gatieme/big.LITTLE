@@ -2,7 +2,7 @@ all	: github
 .PHONY	: github
 
 
-GITHUB_COMMIT	:=	"改进了HMP负载均衡调度器, 完成了编译..."
+GITHUB_COMMIT	:=	"改进的HMP负载均衡调度器, 备份了kernel/sched/fair.c..."
 
 github	:
 	git pull
