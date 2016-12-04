@@ -68,9 +68,6 @@
 #include <linux/cpufreq.h>
 #endif /* CONFIG_HMP_FREQUENCY_INVARIANT_SCALE */
 
-#ifdef CONFIG_SCHED_HMP                         /*  HMP 负载调度器需要 cpuidle 和cpuhotplug 支持  */
-#include <linux/cpuidle.h>
-#endif
 
 #include "sched.h"
 
@@ -82,6 +79,14 @@
 #include <linux/kdb.h>
 #endif      /*  end of CONFIG_KGDB_KDB                          */
 #endif      /*  end of CONFIG_HEAVTEST_INTERFACE                */
+
+
+#ifdef CONFIG_SCHED_HMP                         /*  HMP 负载调度器需要 cpuidle 和cpuhotplug 支持  */
+#include <linux/cpuidle.h>
+
+struct lb_env;
+#include "big_little_hmp.h"
+#endif
 
 
 /*
