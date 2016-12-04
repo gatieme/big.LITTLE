@@ -658,5 +658,60 @@ struct metdevice met_hmp_cfs = {
 };
 EXPORT_SYMBOL(met_hmp_cfs);
 
+
+
 void TaskTh(unsigned int B_th, unsigned int L_th)
 {
+	if (mt_cfs_dbg)
+		trace_printk("%d,%d\n", B_th, L_th);
+}
+
+void HmpStat(struct hmp_statisic *hmp_stats)
+{
+	if (mt_cfs_dbg)
+		trace_printk("%d,%d\n", hmp_stats->nr_force_up, hmp_stats->nr_force_down);
+}
+
+void HmpLoad(int big_load_avg, int little_load_avg)
+{
+	if (mt_cfs_dbg)
+		trace_printk("%d,%d\n", big_load_avg, little_load_avg);
+}
+
+static DEFINE_PER_CPU(unsigned int, cfsrqCnt);
+static DEFINE_PER_CPU(unsigned int, rtrqCnt);
+static DEFINE_PER_CPU(unsigned int, rqCnt);
+
+void RqLen(int cpu, int length)
+{
+	if (mt_cfs_dbg) {
+		per_cpu(rqCnt, cpu) = length;
+#if NR_CPUS == 4
+		trace_printk("%d,%d,%d,%d\n", per_cpu(rqCnt, 0), per_cpu(rqCnt, 1),
+			     per_cpu(rqCnt, 2), per_cpu(rqCnt, 3));
+#endif
+	}
+}
+
+void CfsLen(int cpu, int length)
+{
+	if (mt_cfs_dbg) {
+		per_cpu(cfsrqCnt, cpu) = length;
+#if NR_CPUS == 4
+		trace_printk("%d,%d,%d,%d\n", per_cpu(cfsrqCnt, 0), per_cpu(cfsrqCnt, 1),
+			     per_cpu(cfsrqCnt, 2), per_cpu(cfsrqCnt, 3));
+#endif
+	}
+}
+
+void RtLen(int cpu, int length)
+{
+	if (mt_cfs_dbg) {
+		per_cpu(rtrqCnt, cpu) = length;
+#if NR_CPUS == 4
+		trace_printk("%d,%d,%d,%d\n", per_cpu(rtrqCnt, 0), per_cpu(rtrqCnt, 1),
+			     per_cpu(rtrqCnt, 2), per_cpu(rtrqCnt, 3));
+#endif
+	}
+}
+#endif

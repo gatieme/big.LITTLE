@@ -301,8 +301,7 @@ config HMP_VARIABLE_SCALE
 
 config HMP_FREQUENCY_INVARIANT_SCALE
 	bool "(EXPERIMENTAL) Frequency-Invariant Tracked Load for HMP"
-        depends on HMP_VARIABLE_SCALE && CPU_FREQ
-        depends on !ARCH_SCALE_INVARIANT_CPU_CAPACITY
+        depends on HMP_VARIABLE_SCALE && CPU_FREQ && !ARCH_SCALE_INVARIANT_CPU_CAPACITY
         help
 	  Scales the current load contribution in line with the frequency
 	  of the CPU that the task was executed on.
@@ -344,8 +343,7 @@ config HMP_TRACER
 
 config MET_SCHED_HMP
 	bool "(EXPERIMENTAL) MET SCHED HMP Info"
-	depends on SCHED_HMP_ENHANCEMENT
-	depends on HMP_TRACER
+	depends on SCHED_HMP_ENHANCEMENT && HMP_TRACER
 	help
 	  MET SCHED HMP Info
 
