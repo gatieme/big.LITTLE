@@ -375,7 +375,7 @@ config HMP_DISCARD_CFS_SELECTION_RESULT
 
 config HMP_PACK_SMALL_TASK
 	bool "(EXPERIMENTAL) Packing Small Tasks"
-	depends on SCHED_HMP_ENHANCEMENT
+	depends on SCHED_HMP_ENHANCEMENT && !SCHED_HMP_LITTLE_PACKING
 	help
 		This option enables Packing Small Tasks
 

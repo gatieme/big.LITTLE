@@ -607,3 +607,56 @@ void proc_sched_set_task(struct task_struct *p)
 	memset(&p->se.statistics, 0, sizeof(p->se.statistics));
 #endif
 }
+
+
+
+#ifdef CONFIG_MET_SCHED_HMP
+/* MET */
+#include <linux/export.h>
+#include <linux/met_drv.h>
+
+static char header[] =
+    "met-info [000] 0.0: ms_ud_sys_header: TaskTh,B->th,L->th,d,d\n"
+    "met-info [000] 0.0: ms_ud_sys_header: HmpStat,force_up,force_down,d,d\n"
+    "met-info [000] 0.0: ms_ud_sys_header: HmpLoad,big_load_avg,little_load_avg,d,d\n"
+    "met-info [000] 0.0: ms_ud_sys_header: RqLen,rq0,rq1,rq2,rq3,d,d,d,d\n"
+    "met-info [000] 0.0: ms_ud_sys_header: CfsLen,cfs_rq0,cfs_rq1,cfs_rq2,cfs_rq3,d,d,d,d\n"
+    "met-info [000] 0.0: ms_ud_sys_header: RtLen,rt_rq0,rt_rq1,rt_rq2,rt_rq3,d,d,d,d\n";
+
+static char help[] = "  --met_hmp_cfs                              monitor hmp_cfs\n";
+static int sample_print_help(char *buf, int len)
+{
+	return snprintf(buf, PAGE_SIZE, help);
+}
+
+static int sample_print_header(char *buf, int len)
+{
+	return snprintf(buf, PAGE_SIZE, header);
+}
+
+unsigned int mt_cfs_dbg = 0;
+static void sample_start(void)
+{
+	mt_cfs_dbg = 1;
+	return;
+}
+
+static void sample_stop(void)
+{
+	mt_cfs_dbg = 0;
+	return;
+}
+
+struct metdevice met_hmp_cfs = {
+	.name = "hmp_cfs",
+	.owner = THIS_MODULE,
+	.type = MET_TYPE_BUS,
+	.start = sample_start,
+	.stop = sample_stop,
+	.print_help = sample_print_help,
+	.print_header = sample_print_header,
+};
+EXPORT_SYMBOL(met_hmp_cfs);
+
+void TaskTh(unsigned int B_th, unsigned int L_th)
+{
