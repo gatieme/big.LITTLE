@@ -9209,7 +9209,10 @@ static void hmp_force_up_migration(int this_cpu)
                         hmp_up_migration(curr_cpu, &target_cpu, se, &clbenv) && /*      检查当前小核 CPU(curr_cpu) 上的进程实体 se 是否满足迁移到大核 CPU(target_cpu) 的条件   */
                         !cpu_park(cpu_of(target))) {                            /*      */
                         if (p->state != TASK_DEAD) {    /*      如果当前 CPU 仍然活跃   */
-#if CONFIG_HMP_DELAY_UP_MIGRATION
+#ifdef CONFIG_HMP_DELAY_UP_MIGRATION
+////////////////////////////////////////////////////////////////////////////////
+#warning "you use delay up migration(non force up night now) in CONFIG_SCHED_HMP_ENHANCEMENT which may have much BUGS..."
+////////////////////////////////////////////////////////////////////////////////
                                 /*      由于大核可能多数在睡眠中, 因此我们延迟向上迁移的过程,   */
                                 cpu_rq(target_cpu)->wake_for_idle_pull = 1;         /*  设置将要迁移的目标 CPU(target_cpu) 运行队列上的 wake_for_idle_pull 标志位  */
                                 raw_spin_unlock_irqrestore(&target->lock, flags);
@@ -9456,10 +9459,10 @@ static void hmp_migrate_runnable_task(struct rq *rq)
                 if (cpumask_test_cpu(src_cpu, sched_domain_span(sd)))
                         break;
         }
-    /*  这里和内核默认的负载均衡调度器的 load_balance( ) 函数一样使用 struct lb_env 结构体来描述迁移信息
-     *  迁移的动作是 move_specific_task()函数
-     *
-     *  move_specific_task( ) 函数的实现和 load_balance( )函数里实现的类似  */
+        /*  这里和内核默认的负载均衡调度器的 load_balance( ) 函数一样使用 struct lb_env 结构体来描述迁移信息
+         *  迁移的动作是 move_specific_task()函数
+         *
+         *  move_specific_task( ) 函数的实现和 load_balance( )函数里实现的类似  */
         if (likely(sd)) {
                 struct lb_env env = {
                         .sd             = sd,
@@ -9489,6 +9492,7 @@ out:
  * hmp_force_up_migration checks runqueues for tasks that need to
  * be actively migrated to a faster cpu.
  *
+ * for CONFIG_SCHED_HMP
  * 调用关系
  * run_rebalance_domains( )
  *  ->  hmp_force_up_migration( )
@@ -9502,10 +9506,10 @@ static void hmp_force_up_migration(int this_cpu)
         unsigned int force, got_target;
         struct task_struct *p;
 
-    /*  hmp_force_migration 是一个 HMP 定义的锁  */
+        /*  hmp_force_migration 是一个 HMP 定义的锁  */
         if (!spin_trylock(&hmp_force_migration))
                 return;
-    /*  从头开始遍历 所有在线(活跃)的 CPU, 由cpu_online_mask 标识   */
+        /*  从头开始遍历 所有在线(活跃)的 CPU, 由cpu_online_mask 标识   */
         for_each_online_cpu(cpu) {
                 force = 0;
                 got_target = 0;
@@ -9525,23 +9529,23 @@ static void hmp_force_up_migration(int this_cpu)
                                 cfs_rq = group_cfs_rq(curr);
                         }
                 }
-        /*  任务迁移分为向上迁移和向下迁移,
-         *
-         *  向上迁移(hmp_up_migration)      -=> 将小核上负载最大且符合迁移要求的进程调度实体迁移至空闲的大核target_cpu
-         *  向下迁移(hmp_down_migration)    -=> 将大核上负载最小且符合迁移要求的进程调度实体迁移至空闲的小核target_cpu
-         *
-         *  首先检查是否可以进行向上迁移
-         *
-         *  如果当前遍历到的CPU核是小核, 则
-         *      hmp_get_heaviest_task   从该小核CPU上找到一个负载最大的进程调度实体curr
-         *      hmp_up_migration        判断负载最大的进程是否满足迁移到大核上所需的条件
-         *                              如果满足迁移的要求, 而当前所有的大核中也有空闲的大核
-         *                              则返回 1, 并用target_cpu 标记空闲的大核
-         *      下面通知内核可以将任务的向上迁移
-         *      cpu_rq(target_cpu)->wake_for_idle_pull = 1; 设置将要迁移的目标 CPU(target_cpu) 运行队列上的 wake_for_idle_pull 标志位
-         *      smp_send_reschedule(target_cpu);            发送一个IPI_RESCHEDULE 的 IPI 中断给 target_cpu
-         *
-         *  */
+               /*  任务迁移分为向上迁移和向下迁移,
+                *
+                *  向上迁移(hmp_up_migration)      -=> 将小核上负载最大且符合迁移要求的进程调度实体迁移至空闲的大核target_cpu
+                *  向下迁移(hmp_down_migration)    -=> 将大核上负载最小且符合迁移要求的进程调度实体迁移至空闲的小核target_cpu
+                *
+                *  首先检查是否可以进行向上迁移
+                *
+                *  如果当前遍历到的CPU核是小核, 则
+                *      hmp_get_heaviest_task   从该小核CPU上找到一个负载最大的进程调度实体curr
+                *      hmp_up_migration        判断负载最大的进程是否满足迁移到大核上所需的条件
+                *                              如果满足迁移的要求, 而当前所有的大核中也有空闲的大核
+                *                              则返回 1, 并用target_cpu 标记空闲的大核
+                *      下面通知内核可以将任务的向上迁移
+                *      cpu_rq(target_cpu)->wake_for_idle_pull = 1; 设置将要迁移的目标 CPU(target_cpu) 运行队列上的 wake_for_idle_pull 标志位
+                *      smp_send_reschedule(target_cpu);            发送一个IPI_RESCHEDULE 的 IPI 中断给 target_cpu
+                *
+                *  */
                 orig = curr;
                 curr = hmp_get_heaviest_task(curr, -1); /*  从当前 CPU(小核) 中找到负载 se->avg.load_avg_ratio 最大(即最繁忙)的那个进程*/
                 if (!curr) {                            /*  没有需要迁移的进程*/
@@ -9550,51 +9554,89 @@ static void hmp_force_up_migration(int this_cpu)
                 }
                 p = task_of(curr);                      /*  获取到找到的大负载进行的 task_struct 结构 */
                 if (hmp_up_migration(cpu, &target_cpu, curr)) {         /*  判断刚才取得的最大负载的调度实体 curr 是否需要迁移到大核 CPU 上, 如果需要则找到大核中一个空闲的 CPU(target_cpu)  */
+#ifdef CONFIG_HMP_DELAY_UP_MIGRATION
+                        /* when we detect that a task running on a little CPU
+                         * to a bigger CPU which may be in a deep sleep state in most cases.
+                         * we need to wait for the target CPU to wake up
+                         * before we can restart the task which is being moved.
+                         * Instead, we now wake a big CPU with an IPI and ask it to pull a task when ready.
+                         * This allows the task to continue executing on its current CPU,
+                         * reducing the amount of time that the task is stalled for.       */
                         cpu_rq(target_cpu)->wake_for_idle_pull = 1;         /*  设置将要迁移的目标 CPU(target_cpu) 运行队列上的 wake_for_idle_pull 标志位  */
                         raw_spin_unlock_irqrestore(&target->lock, flags);
                         spin_unlock(&hmp_force_migration);
                         smp_send_reschedule(target_cpu);                    /*  发送一个IPI_RESCHEDULE 的 IPI 中断给 target_cpu */
-                        return;
-                }
-        /*  刚才那个 CPU 真是小幸运,
-         *      正好它是小核上的 CPU
-         *      并且有合适迁移到大核上的进程(负载大于阀值, 且近期未发生迁移, 进程优先级也满足阀值要求)
-         *      最重要的是大核调度域上有空闲的 CPU,
-         *  这叫作无巧不成书.
-         *
-         *  我们下面看看没那么好运气的其他 CPU 的情况, 一般来说有如下几种情况
-         *      hmp_up_migration( )返回了 0
-         *          一种是调度实体curr需要向上迁移, 但是大核的调度域内没有空闲的的大核CPU
-         *          另外一种是调度实体不需要迁移(不满足阀值要求, 或者curr本身就在大核上)
-         *
-         *  我们首先考虑curr本身就在大核上运行的情况其他的情况,
-         *  curr运行在大核上时hmp_get_heaviest_task直接返回了curr(此时orig == curr)
-         *  而hmp_up_migration( )在判断进程在大核上运行时也直接返回了0,
-         */
+#else   /*      #ifdef CONFIG_HMP_DELAY_UP_MIGRATION       */
+////////////////////////////////////////////////////////////////////////////////
+#warning "you use non delay up migration(force up right now) in CONFIG_SCHED_HMP which may have much BUG which may have much BUGS..."
+////////////////////////////////////////////////////////////////////////////////
+                        /*      注意此处可能存在较多BUG */
+                        if(!target->active_balance && task_rq(p) == target){
+                                get_task_struct(p);
+                                target->push_cpu = this_cpu;
+                                target->migrate_task = p;
+                                trace_sched_hmp_migrate(p, target->push_cpu, HMP_MIGRATE_IDLE_PULL);
+                                hmp_next_up_delay(&p->se, target->push_cpu);    /*  更新当前迁移的时间为 now    */
+                        }
+                        if (!task_running(target, p)) {     /*  如果要迁移的进程p没有正在运行, 即p->on_cpu == 0, 则可以进行迁移 */
+                                trace_sched_hmp_migrate_force_running(p, 0);
+                                hmp_migrate_runnable_task(target);  /*  完成任务迁移*/
+                        } else {                            /*  否则待迁移的进程如果正在运行            */
+                                target->active_balance = 1;     /*  设置 target 运行队列的 avtive_balance   */
+                                force = 1;                      /*  设置强制迁移标示为1                     */
+                                //got_target = 1;
+                        }
+                        raw_spin_unlock_irqrestore(&target->lock, flags);
 
-        /*  任务迁移分为向上迁移和向下迁移,
-         *
-         *  向上迁移(hmp_up_migration)      -=> 将小核上负载最大且符合迁移要求的进程调度实体迁移至空闲的大核target_cpu
-         *  向下迁移(hmp_down_migration)    -=> 将大核上负载最小且符合迁移要求的进程调度实体迁移至空闲的小核target_cpu
-         *
-         *  接着检查是否可以进行向下迁移
-         *
-         *  如果当前遍历到的CPU核是大核, 则
-         *      hmp_get_lightest_task   从该大核 CPU 上找到一个负载最小的进程调度实体 curr
-         *      hmp_offload_down        判断负载最小的进程是否满足迁移到小核上所需的条件
-         *                              如果满足迁移的要求, 而当前所有的小核中也有空闲的小核
-         *                              则返回可以迁移的空闲的小核
-         *
-         *      接着完善迁移信息, 填充迁移源 CPU 的任务队列 rq(target) 的信息,
-         *      包括如下信息    :
-         *          迁移目标cpu(target->push_cpu)
-         *          待迁移进程target->migrate_task = p;
-         *
-         *      最后内核完成任务的向下迁移
-         *          如果待迁移的任务没在运行, 直接调用 hmp_migrate_runnable_task(target)完成任务迁移
-         *          如果带迁移的任务在运行, 则调用 stop_one_cpu_nowait(cpu_of(target) 暂停迁移源 CPU 后, 强行进行迁移
-         */
-        if (!got_target) {                                      /*  如果此时没有*/
+                        if (force) {              /*  依照前面所述, 待迁移的进程 p 正在运行中, 则 force被置为 1 */
+                                stop_one_cpu_nowait(cpu_of(target),
+                                        hmp_active_task_migration_cpu_stop,
+                                        target, &target->active_balance_work);  /*  暂停迁移源 CPU 后, 强行进行迁移 */
+                        }
+                        spin_unlock(&hmp_force_migration);
+#endif  /*      #ifdef CONFIG_HMP_DELAY_UP_MIGRATION       */
+                        return ;
+                }
+
+                /*  刚才那个 CPU 真是小幸运,
+                *      正好它是小核上的 CPU
+                *      并且有合适迁移到大核上的进程(负载大于阀值, 且近期未发生迁移, 进程优先级也满足阀值要求)
+                *      最重要的是大核调度域上有空闲的 CPU,
+                *  这叫作无巧不成书.
+                *
+                *  我们下面看看没那么好运气的其他 CPU 的情况, 一般来说有如下几种情况
+                *      hmp_up_migration( )返回了 0
+                *          一种是调度实体curr需要向上迁移, 但是大核的调度域内没有空闲的的大核CPU
+                *          另外一种是调度实体不需要迁移(不满足阀值要求, 或者curr本身就在大核上)
+                *
+                *  我们首先考虑curr本身就在大核上运行的情况其他的情况,
+                *  curr运行在大核上时hmp_get_heaviest_task直接返回了curr(此时orig == curr)
+                *  而hmp_up_migration( )在判断进程在大核上运行时也直接返回了0,
+                */
+
+                /*  任务迁移分为向上迁移和向下迁移,
+                *
+                *  向上迁移(hmp_up_migration)      -=> 将小核上负载最大且符合迁移要求的进程调度实体迁移至空闲的大核target_cpu
+                *  向下迁移(hmp_down_migration)    -=> 将大核上负载最小且符合迁移要求的进程调度实体迁移至空闲的小核target_cpu
+                *
+                *  接着检查是否可以进行向下迁移
+                *
+                *  如果当前遍历到的CPU核是大核, 则
+                *      hmp_get_lightest_task   从该大核 CPU 上找到一个负载最小的进程调度实体 curr
+                *      hmp_offload_down        判断负载最小的进程是否满足迁移到小核上所需的条件
+                *                              如果满足迁移的要求, 而当前所有的小核中也有空闲的小核
+                *                              则返回可以迁移的空闲的小核
+                *
+                *      接着完善迁移信息, 填充迁移源 CPU 的任务队列 rq(target) 的信息,
+                *      包括如下信息    :
+                *          迁移目标cpu(target->push_cpu)
+                *          待迁移进程target->migrate_task = p;
+                *
+                *      最后内核完成任务的向下迁移
+                *          如果待迁移的任务没在运行, 直接调用 hmp_migrate_runnable_task(target)完成任务迁移
+                *          如果带迁移的任务在运行, 则调用 stop_one_cpu_nowait(cpu_of(target) 暂停迁移源 CPU 后, 强行进行迁移
+                */
+                if (!got_target) {                                      /*  如果此时没有*/
                         /*
                          * For now we just check the currently running task.
                          * Selecting the lightest task for offloading will
@@ -9704,11 +9746,11 @@ static unsigned int hmp_idle_pull(int this_cpu)
         if (!p)
                 goto done;
 
-        /* now we have a candidate
-     * 迁移进程 migrate_task    :   是刚才找到的 p = task_of(curr) 进程
-     * 迁移源 CPU               :   迁移进程对应的 CPU
-     * 迁移目的地 CPU           :   当前 CPU, 当前 CPU 是大核调度域中的一个
-     * */
+       /* now we have a candidate
+        * 迁移进程 migrate_task    :   是刚才找到的 p = task_of(curr) 进程
+        * 迁移源 CPU               :   迁移进程对应的 CPU
+        * 迁移目的地 CPU           :   当前 CPU, 当前 CPU 是大核调度域中的一个
+        * */
         raw_spin_lock_irqsave(&target->lock, flags);
         if (!target->active_balance && task_rq(p) == target) {
                 get_task_struct(p);

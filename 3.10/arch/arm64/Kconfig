@@ -367,8 +367,8 @@ config ARCH_SCALE_INVARIANT_CPU_CAPACITY
          1023 is the highest capacity available in the system.
 
 config HMP_DELAY_UP_MIGRATION
-        bool "(EXPERIMENTAL-HMP) Delay migration task for LITTLE to BIG"
-        depends on SCHE_HMP
+        bool "(EXPERIMENTAL-HMP) Delay migration task from LITTLE to BIG"
+        depends on SCHED_HMP
         help
           In this version we have stopped using forced up migrations when we
           detect that a task running on a little CPU should be moved to a bigger

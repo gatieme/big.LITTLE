@@ -478,7 +478,7 @@ struct rq {
 #ifdef CONFIG_SCHED_HMP
 	struct task_struct *migrate_task;       /*  当前 CPU 运行队列 rq 上, 待迁移的进程   */
 	int wake_for_idle_pull;                 /*  当 发生 向上迁移(up migrate) 时, 通知大核 CPU 苏醒wakeup执行迁移的标识  */
-#endif
+#endif  /*      #ifdef CONFIG_SCHED_HMP */
 	/* cpu of this runqueue: */
 	int cpu;
 	int online;
