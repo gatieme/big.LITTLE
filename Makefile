@@ -2,7 +2,7 @@ all	: github
 .PHONY	: github
 
 
-GITHUB_COMMIT	:=	"备份 fair.c  至完整的 hmpcb 调度算法 backup/fair_mpcb.c"
+GITHUB_COMMIT	:=	"完善改进的hmp-cb负载均衡调度器..."
 
 github	:
 	git pull

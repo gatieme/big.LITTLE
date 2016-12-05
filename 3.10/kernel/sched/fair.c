@@ -8546,7 +8546,13 @@ static int hmp_down_stable(int cpu)
         return 1;
 }
 
-/* Select the most appropriate CPU from hmp cluster */
+/* Select the most appropriate CPU from hmp cluster
+ * 为进程 p 找到一个最适合的 cpu 供其运行
+ * 调用关系
+ * run_rebalance_domains( )
+ *      ->      hmp_force_up_migration( )
+ *              ->      hmp_select_cpu( )
+ * */
 static unsigned int hmp_select_cpu(unsigned int caller, struct task_struct *p,
                         struct cpumask *mask, int prev)
 {
@@ -8797,12 +8803,21 @@ static inline void hmp_dynamic_threshold(struct clb_env *clbenv)
 
 /*
  * Check whether this task should be migrated to big
+ * 检查一个小核上的进程是否需要迁移到大核上
+ *
  * Briefly summarize the flow as below;
  * 1) Migration stabilizing
  * 1.5) Keep all cpu busy
  * 2) Filter low-priorty task
  * 3) Check CPU capacity
  * 4) Check dynamic migration threshold
+ *
+ * 参数
+ *
+ * cpu          :       进程当前所在的 CPU
+ * target_cpu   :       进程待迁移的目标 CPU
+ * se           :       待迁移的进程实体
+ * clb_env      :       迁移统计信息
  */
 static unsigned int hmp_up_migration(int cpu, int *target_cpu, struct sched_entity *se,
                                                                         struct clb_env *clbenv)
@@ -9126,9 +9141,9 @@ static void hmp_force_up_migration(int this_cpu)
 #endif  /*      #ifdef CONFIG_HMP_TRACER        */
 
         /* Migrate heavy task from LITTLE to big */
-        for_each_cpu(curr_cpu, &hmp_slow_cpu_mask) {
+        for_each_cpu(curr_cpu, &hmp_slow_cpu_mask) {    /*      遍历所有的小核  */
                 /* Check whether CPU is online */
-                if (!cpu_online(curr_cpu))
+                if (!cpu_online(curr_cpu))              /*      跳过所有非活跃的CPU     */
                         continue;
 
                 force = 0;
@@ -9140,7 +9155,9 @@ static void hmp_force_up_migration(int this_cpu)
                         continue;
                 }
 
-                /* Find task entity */
+                /* Find task entity
+                 * 如果当前运行的调度实体 se 不是一个进程, 而是一个进程组 group 标识
+                 * 则从中取出当前正在运行的进程的信息   */
                 if (!entity_is_task(se)) {
                         struct cfs_rq *cfs_rq;
                         cfs_rq = group_cfs_rq(se);
@@ -9150,9 +9167,9 @@ static void hmp_force_up_migration(int this_cpu)
                         }
                 }
 
-                p = task_of(se);
-                target_cpu = hmp_select_cpu(HMP_GB, p, &hmp_fast_cpu_mask, -1);
-                if (NR_CPUS == target_cpu) {
+                p = task_of(se);        /* get task_struct, 获取到调度实体 se 的 task_struct 信息*/
+                target_cpu = hmp_select_cpu(HMP_GB, p, &hmp_fast_cpu_mask, -1); /*      从大核的调度域中找到一个合适的 CPU 以供进程 p 运行      */
+                if (NR_CPUS == target_cpu) {            /*      未找到合适的 CPU 时, 返回 NR_CPUS       */
                         raw_spin_unlock_irqrestore(&target->lock, flags);
                         continue;
                 }
@@ -9189,9 +9206,13 @@ static void hmp_force_up_migration(int this_cpu)
 
                 /* Check migration threshold */
                 if (!target->active_balance &&
-                        hmp_up_migration(curr_cpu, &target_cpu, se, &clbenv) &&
-                        !cpu_park(cpu_of(target))) {
-                        if (p->state != TASK_DEAD) {
+                        hmp_up_migration(curr_cpu, &target_cpu, se, &clbenv) && /*      检查当前小核 CPU(curr_cpu) 上的进程实体 se 是否满足迁移到大核 CPU(target_cpu) 的条件   */
+                        !cpu_park(cpu_of(target))) {                            /*      */
+                        if (p->state != TASK_DEAD) {    /*      如果当前 CPU 仍然活跃   */
+                                //cpu_rq(target_cpu)->wake_for_idle_pull = 1;         /*  设置将要迁移的目标 CPU(target_cpu) 运行队列上的 wake_for_idle_pull 标志位  */
+                                //raw_spin_unlock_irqrestore(&target->lock, flags);
+                                //spin_unlock(&hmp_force_migration);
+                                //smp_send_reschedule(target_cpu);                    /*  发送一个IPI_RESCHEDULE 的 IPI 中断给 target_cpu */
                                 target->active_balance = 1; /* force up */
                                 target->push_cpu = target_cpu;
                                 target->migrate_task = p;
