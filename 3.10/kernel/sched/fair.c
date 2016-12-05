@@ -9209,7 +9209,8 @@ static void hmp_force_up_migration(int this_cpu)
                         hmp_up_migration(curr_cpu, &target_cpu, se, &clbenv) && /*      检查当前小核 CPU(curr_cpu) 上的进程实体 se 是否满足迁移到大核 CPU(target_cpu) 的条件   */
                         !cpu_park(cpu_of(target))) {                            /*      */
                         if (p->state != TASK_DEAD) {    /*      如果当前 CPU 仍然活跃   */
-#if 0   /*      由于大核可能多数在睡眠中, 因此我们延迟向上迁移的过程,   */
+#if CONFIG_HMP_DELAY_UP_MIGRATION
+                                /*      由于大核可能多数在睡眠中, 因此我们延迟向上迁移的过程,   */
                                 cpu_rq(target_cpu)->wake_for_idle_pull = 1;         /*  设置将要迁移的目标 CPU(target_cpu) 运行队列上的 wake_for_idle_pull 标志位  */
                                 raw_spin_unlock_irqrestore(&target->lock, flags);
                                 spin_unlock(&hmp_force_migration);
@@ -9240,7 +9241,7 @@ out_force_up:
                                 raw_spin_unlock_irqrestore(&target->lock, flags);
                         }
                 }
-#endif
+#endif  /*      #if CONFIG_HMP_DELAY_UP_MIGRATION       */
         }
 
 #ifdef CONFIG_HMP_GLOBAL_BALANCE

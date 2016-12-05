@@ -2,7 +2,7 @@ all	: github
 .PHONY	: github
 
 
-GITHUB_COMMIT	:=	"完善改进的hmp-cb负载均衡调度器, 准备为其加入延迟向上迁移的代码..."
+GITHUB_COMMIT	:=	"改进了 HMP/HMPCB 负载均衡调度器的..."
 
 github	:
 	git pull

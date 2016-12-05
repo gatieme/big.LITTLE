@@ -230,8 +230,12 @@ config SCHED_SMT
 	  MultiThreading at a cost of slightly increased overhead in some
 	  places. If unsure say N here.
 
+#----------------------------------------------
+# linaro's configs for CONFIG_SCHED_HMP
+#----------------------------------------------
+
 config DISABLE_CPU_SCHED_DOMAIN_BALANCE
-	bool "(EXPERIMENTAL) Disable CPU level scheduler load-balancing"
+	bool "(EXPERIMENTAL-HMP) Disable CPU level scheduler load-balancing"
 	help
 	  Disables scheduler load-balancing at CPU sched domain level.
 
@@ -256,12 +260,12 @@ config SCHED_HMP_PRIO_FILTER
 	  with less compute capacity.
 
 config SCHED_HMP_PRIO_FILTER_VAL
-	int "NICE priority threshold"
+	int "(EXPERIMENTAL-HMP) NICE priority threshold"
 	default 5
 	depends on SCHED_HMP_PRIO_FILTER
 
 config HMP_FAST_CPU_MASK
-	string "HMP scheduler fast CPU mask"
+	string "(EXPERIMENTAL-HMP) HMP scheduler fast CPU mask"
 	depends on SCHED_HMP
 	help
           Leave empty to use device tree information.
@@ -269,7 +273,7 @@ config HMP_FAST_CPU_MASK
 	  e.g. cpuid 0+1 should be specified as 0-1.
 
 config HMP_SLOW_CPU_MASK
-	string "HMP scheduler slow CPU mask"
+	string "(EXPERIMENTAL-HMP) HMP scheduler slow CPU mask"
 	depends on SCHED_HMP
 	help
 	  Leave empty to use device tree information.
@@ -277,7 +281,7 @@ config HMP_SLOW_CPU_MASK
 	  e.g. cpuid 0+1 should be specified as 0-1.
 
 config HMP_VARIABLE_SCALE
-	bool "Allows changing the load tracking scale through sysfs"
+	bool "(EXPERIMENTAL-HAP) Allows changing the load tracking scale through sysfs"
 	depends on SCHED_HMP
 	help
 	  When turned on, this option exports the thresholds and load average
@@ -314,6 +318,8 @@ config HMP_FREQUENCY_INVARIANT_SCALE
 	  migration strategy to interact more predictably with CPUFreq's
 	  asynchronous compute capacity changes.
 
+
+
 config SCHED_HMP_LITTLE_PACKING
 	bool "(EXPERIMENTAL-HMP)Small task packing for HMP"
 	depends on SCHED_HMP
@@ -335,12 +341,54 @@ config HMP_TRACER
 
 # add by gatieme(ChengJean) for SCHED_HMP_ENHANCEMENT
 # begin 2016-12-01 16:25
+
+#----------------------------------------------
+# pack configs for CONFIG_SCHED_HMP
+#----------------------------------------------
+
+config HEVTASK_INTERFACE
+	bool "(EXPERIMENTAL-HMP)task status interface"
+	help
+	  The option provide an interface to show task status
+
+config ARCH_SCALE_INVARIANT_CPU_CAPACITY
+       bool "(EXPERIMENTAL-HMP) Scale-Invariant CPU Compute Capacity Recording"
+       depends on CPU_FREQ
+       help
+         Provides a new measure of maximum and instantaneous CPU compute
+         capacity, derived from a table of relative compute performance
+         for each core type present in the system. The table is an
+         estimate and specific core performance may be different for
+         any particular workload. The measure includes the relative
+         performance and a linear scale of current to maximum frequency
+         such that at maximum frequency (as expressed in the DTB) the
+         reported compute capacity will be equal to the estimated
+         performance from the table. Values range between 0 and 1023 where
+         1023 is the highest capacity available in the system.
+
+config HMP_DELAY_UP_MIGRATION
+        bool "(EXPERIMENTAL-HMP) Delay migration task for LITTLE to BIG"
+        depends on SCHE_HMP
+        help
+          In this version we have stopped using forced up migrations when we
+          detect that a task running on a little CPU should be moved to a bigger
+          CPU. In most cases, the bigger CPU is in a deep sleep state and a forced
+          migration means we stop the task immediately but need to wait for the
+          target CPU to wake up before we can restart the task which is being
+          moved. Instead, we now wake a big CPU with an IPI and ask it to pull
+          a task when ready. This allows the task to continue executing on its
+          current CPU, reducing the amount of time that the task is stalled for.
+
+
+#----------------------------------------------
+# pack configs for CONFIG_SCHED_HMP_ENHANCEMENT
+#----------------------------------------------
+
 config SCHED_HMP_ENHANCEMENT
 	bool "(EXPERIMENTAL-HMPCB) HMP Ennhancement"
 	depends on SCHED_HMP
 	help
 	  HMP Ennhancement
-
 
 config MET_SCHED_HMP
 	bool "(EXPERIMENTAL-HMPCB) MET SCHED HMP Info"
@@ -403,25 +451,6 @@ config HMP_POWER_AWARE_CONTROLLER
 	help
 		Power-aware scheduler for b.L MP controller and status interface
 
-config HEVTASK_INTERFACE
-	bool "(EXPERIMENTAL-HMP)task status interface"
-	help
-	  The option provide an interface to show task status
-
-config ARCH_SCALE_INVARIANT_CPU_CAPACITY
-       bool "(EXPERIMENTAL-HMP) Scale-Invariant CPU Compute Capacity Recording"
-       depends on CPU_FREQ
-       help
-         Provides a new measure of maximum and instantaneous CPU compute
-         capacity, derived from a table of relative compute performance
-         for each core type present in the system. The table is an
-         estimate and specific core performance may be different for
-         any particular workload. The measure includes the relative
-         performance and a linear scale of current to maximum frequency
-         such that at maximum frequency (as expressed in the DTB) the
-         reported compute capacity will be equal to the estimated
-         performance from the table. Values range between 0 and 1023 where
-         1023 is the highest capacity available in the system.
 
 # add by gatieme(ChengJean) for SCHED_HMP_ENHANCEMENT
 # end 2016-12-01 16:35
