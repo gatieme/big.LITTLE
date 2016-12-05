@@ -236,7 +236,7 @@ config DISABLE_CPU_SCHED_DOMAIN_BALANCE
 	  Disables scheduler load-balancing at CPU sched domain level.
 
 config SCHED_HMP
-	bool "(EXPERIMENTAL) Heterogenous multiprocessor scheduling"
+	bool "(EXPERIMENTAL-HMP) Heterogenous multiprocessor scheduling"
 	depends on DISABLE_CPU_SCHED_DOMAIN_BALANCE && SCHED_MC && FAIR_GROUP_SCHED && !SCHED_AUTOGROUP
 	help
 	  Experimental scheduler optimizations for heterogeneous platforms.
@@ -248,7 +248,7 @@ config SCHED_HMP
 	  between cpus of different type (DISABLE_CPU_SCHED_DOMAIN_BALANCE).
 
 config SCHED_HMP_PRIO_FILTER
-	bool "(EXPERIMENTAL) Filter HMP migrations by task priority"
+	bool "(EXPERIMENTAL-HMP) Filter HMP migrations by task priority"
 	depends on SCHED_HMP
 	help
 	  Enables task priority based HMP migration filter. Any task with
@@ -300,7 +300,7 @@ config HMP_VARIABLE_SCALE
 	  but it remove intermadiate overflows in computation.
 
 config HMP_FREQUENCY_INVARIANT_SCALE
-	bool "(EXPERIMENTAL) Frequency-Invariant Tracked Load for HMP"
+	bool "(EXPERIMENTAL-HMP) Frequency-Invariant Tracked Load for HMP"
         depends on HMP_VARIABLE_SCALE && CPU_FREQ && !ARCH_SCALE_INVARIANT_CPU_CAPACITY
         help
 	  Scales the current load contribution in line with the frequency
@@ -315,7 +315,7 @@ config HMP_FREQUENCY_INVARIANT_SCALE
 	  asynchronous compute capacity changes.
 
 config SCHED_HMP_LITTLE_PACKING
-	bool "Small task packing for HMP"
+	bool "(EXPERIMENTAL-HMP)Small task packing for HMP"
 	depends on SCHED_HMP
 	default n
 	help
@@ -326,89 +326,90 @@ config SCHED_HMP_LITTLE_PACKING
 	  packing_limit: runqueue load ratio where a RQ is considered
 	    to be full. Default is NICE_0_LOAD * 9/8.
 
+config HMP_TRACER
+	bool "(EXPERIMENTAL-HMP) Profile HMP scheduler"
+	depends on SCHED_HMP
+        help
+	  Profile HMP scheduler
+
 
 # add by gatieme(ChengJean) for SCHED_HMP_ENHANCEMENT
 # begin 2016-12-01 16:25
 config SCHED_HMP_ENHANCEMENT
-	bool "(EXPERIMENTAL) HMP Ennhancement"
+	bool "(EXPERIMENTAL-HMPCB) HMP Ennhancement"
 	depends on SCHED_HMP
 	help
 	  HMP Ennhancement
 
-config HMP_TRACER
-	bool "(EXPERIMENTAL) Profile HMP scheduler"
-	depends on SCHED_HMP_ENHANCEMENT
-	help
-	  Profile HMP scheduler
 
 config MET_SCHED_HMP
-	bool "(EXPERIMENTAL) MET SCHED HMP Info"
+	bool "(EXPERIMENTAL-HMPCB) MET SCHED HMP Info"
 	depends on SCHED_HMP_ENHANCEMENT && HMP_TRACER && SCHED_DEBUG
 	help
 	  MET SCHED HMP Info
 
 config HMP_DYNAMIC_THRESHOLD
-	bool "(EXPERIMENTAL) Dynamically adjust task migration threshold"
+	bool "(EXPERIMENTAL-HMPCB) Dynamically adjust task migration threshold"
 	depends on SCHED_HMP_ENHANCEMENT
 	help
 	  Dynamically adjust task migration threshold according to current system load
 
 config HMP_GLOBAL_BALANCE
-	bool "(EXPERIMENTAL) Enhance HMP global load balance"
+	bool "(EXPERIMENTAL-HMPCB) Enhance HMP global load balance"
 	depends on SCHED_HMP_ENHANCEMENT
 	help
 	  Enhance HMP global load balance
 
 config HMP_TASK_ASSIGNMENT
-	bool "(EXPERIMENTAL) Enhance HMP task assignment"
+	bool "(EXPERIMENTAL-HMPCB) Enhance HMP task assignment"
 	depends on SCHED_HMP_ENHANCEMENT
 	help
 	  Enhance HMP task assignment
 
 config HMP_DISCARD_CFS_SELECTION_RESULT
-	bool "(EXPERIMENTAL) Discard CFS runqueue selection result"
+	bool "(EXPERIMENTAL-HMPCB) Discard CFS runqueue selection result"
 	depends on SCHED_HMP_ENHANCEMENT && HMP_TASK_ASSIGNMENT
 	help
 	  Discard CFS runqueue selection result even if only one cluster exists
 
 config HMP_PACK_SMALL_TASK
-	bool "(EXPERIMENTAL) Packing Small Tasks"
+	bool "(EXPERIMENTAL-HMPCB) Packing Small Tasks"
 	depends on SCHED_HMP_ENHANCEMENT && !SCHED_HMP_LITTLE_PACKING
 	help
 		This option enables Packing Small Tasks
 
 config HMP_PACK_BUDDY_INFO
-	bool "(EXPERIMENTAL) Packing Small Tasks Buddy Information Log"
+	bool "(EXPERIMENTAL-HMPCB) Packing Small Tasks Buddy Information Log"
 	depends on SCHED_HMP_ENHANCEMENT && HMP_PACK_SMALL_TASK
 	help
 		This option enables Packing Small Tasks Buddy Information Log
 
 config HMP_PACK_STOP_MACHINE
-        bool "(EXPERIMENTAL) Packing HMP-stop machine"
+        bool "(EXPERIMENTAL-HMPCB) Packing HMP-stop machine"
         depends on SCHED_HMP_ENHANCEMENT
         help
                 This option enables Packing stop machine at the time of need
                 add by gatieme(ChengJean) @ 2012-12-03 22:16
 
 config HMP_LAZY_BALANCE
-	bool "(EXPERIMENTAL) Lazy Balance"
+	bool "(EXPERIMENTAL-HMPCB) Lazy Balance"
 	depends on SCHED_HMP_ENHANCEMENT && HMP_PACK_SMALL_TASK
 	help
 		This option enables Lazy Balance
 
 config HMP_POWER_AWARE_CONTROLLER
-	bool "(EXPERIMENTAL) Power-aware Scheduler for b.L MP Controller"
+	bool "(EXPERIMENTAL-HMPCB) Power-aware Scheduler for b.L MP Controller"
 	depends on SCHED_HMP_ENHANCEMENT && HMP_PACK_SMALL_TASK && HMP_LAZY_BALANCE
 	help
 		Power-aware scheduler for b.L MP controller and status interface
 
 config HEVTASK_INTERFACE
-	bool "task status interface"
+	bool "(EXPERIMENTAL-HMP)task status interface"
 	help
 	  The option provide an interface to show task status
 
 config ARCH_SCALE_INVARIANT_CPU_CAPACITY
-       bool "(EXPERIMENTAL) Scale-Invariant CPU Compute Capacity Recording"
+       bool "(EXPERIMENTAL-HMP) Scale-Invariant CPU Compute Capacity Recording"
        depends on CPU_FREQ
        help
          Provides a new measure of maximum and instantaneous CPU compute

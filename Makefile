@@ -2,7 +2,7 @@ all	: github
 .PHONY	: github
 
 
-GITHUB_COMMIT	:=	"创建了backup目录, 备份了fair.c文件, 同时在backup目录下将hmp和原本的cfs分割开..."
+GITHUB_COMMIT	:=	"修复了单个HMP模式下if-endif宏匹配的问题..."
 
 github	:
 	git pull
