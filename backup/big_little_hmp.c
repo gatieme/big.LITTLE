@@ -95,10 +95,10 @@ struct lb_env;
  * Save the id of the optimal CPU that should be used to pack small tasks
  * The value -1 is used when no buddy has been found
  */
-DEFINE_PER_CPU(int, sd_pack_buddy) = {-1};
+extern DEFINE_PER_CPU(int, sd_pack_buddy);// = {-1};
 
 #ifdef CONFIG_MTK_SCHED_CMP_PACK_SMALL_TASK
-struct cpumask buddy_cpu_map = { {0} };
+extern struct cpumask buddy_cpu_map;// = { {0} };
 #endif  /*  CONFIG_MTK_SCHED_CMP_PACK_SMALL_TASK    */
 
 /* Look for the best buddy CPU that can be used to pack small tasks
@@ -459,7 +459,7 @@ void sched_get_big_little_cpus(struct cpumask *big, struct cpumask *little)
 {
     arch_get_big_little_cpus(big, little);
 }
-EXPORT_SYMBOL(sched_get_big_little_cpus);
+//EXPORT_SYMBOL(sched_get_big_little_cpus);
 
 #endif  /*  CONFIG_SCHED_HMP_ENHANCEMENT    */
 
@@ -1159,7 +1159,7 @@ static inline struct hmp_domain *hmp_smallest_domain(void)
  * Selects a cpu in previous (faster) hmp_domain
  * Note that cpumask_any_and() returns the first cpu in the cpumask
  */
-static inline unsigned int hmp_select_faster_cpu(struct task_struct *tsk,
+unsigned int hmp_select_faster_cpu(struct task_struct *tsk,
                                                         int cpu)
 {
         int lowest_cpu = NR_CPUS;

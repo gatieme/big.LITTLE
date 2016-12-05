@@ -22,6 +22,37 @@
 #ifndef __BIT_LITTLE_HMP_H_INCLUDE__
 #define __BIT_LITTLE_HMP_H_INCLUDE__
 
+////////////////////////////////////////////////////////////////////////////////
+//  the next information is defined in fair.c but big_little_hmp need
+////////////////////////////////////////////////////////////////////////////////
+#ifdef CONFIG_FAIR_GROUP_SCHED
+
+#ifndef entity_is_task
+#define entity_is_task(se)      (!se->my_q)
+#endif
+
+#ifndef for_each_sched_entity
+#define for_each_sched_entity(se) \
+                for (; se; se = se->parent)
+#endif
+
+#else
+#endif
+
+/* Only depends on SMP, FAIR_GROUP_SCHED may be removed when useful in lb */
+#if defined(CONFIG_SMP) && defined(CONFIG_FAIR_GROUP_SCHED)
+/* see the next MACRO in fair.c */
+/*
+ * We choose a half-life close to 1 scheduling period.
+ * Note: The tables below are dependent on this value.
+ */
+#define LOAD_AVG_PERIOD 32
+#define LOAD_AVG_MAX 47742 /* maximum possible load avg */
+#define LOAD_AVG_MAX_N 345 /* number of full periods to produce LOAD_MAX_AVG */
+#endif  /* #if defined(CONFIG_SMP) && defined(CONFIG_FAIR_GROUP_SCHED) */
+////////////////////////////////////////////////////////////////////////////////
+//  the information above is defined in fair.c but big_little_hmp need
+////////////////////////////////////////////////////////////////////////////////
 
 #include <linux/latencytop.h>
 #include <linux/sched.h>
@@ -102,34 +133,34 @@ struct cpumask buddy_cpu_map = { {0} };
 
 
 #ifdef CONFIG_MTK_SCHED_CMP_POWER_AWARE_CONTROLLER
-DEFINE_PER_CPU(u32, BUDDY_CPU_RQ_USAGE);
-DEFINE_PER_CPU(u32, BUDDY_CPU_RQ_PERIOD);
-DEFINE_PER_CPU(u32, BUDDY_CPU_RQ_NR);
-DEFINE_PER_CPU(u32, TASK_USGAE);
-DEFINE_PER_CPU(u32, TASK_PERIOD);
-u32 PACK_FROM_CPUX_TO_CPUY_COUNT[NR_CPUS][NR_CPUS];
-u32 AVOID_LOAD_BALANCE_FROM_CPUX_TO_CPUY_COUNT[NR_CPUS][NR_CPUS];
-u32 AVOID_WAKE_UP_FROM_CPUX_TO_CPUY_COUNT[NR_CPUS][NR_CPUS];
-u32 TASK_PACK_CPU_COUNT[4][NR_CPUS] = { {0} };
-u32 PA_ENABLE = 1;
-u32 PA_MON_ENABLE = 0;
-char PA_MON[4][TASK_COMM_LEN] = { {0} };
+extern DEFINE_PER_CPU(u32, BUDDY_CPU_RQ_USAGE);
+extern DEFINE_PER_CPU(u32, BUDDY_CPU_RQ_PERIOD);
+extern DEFINE_PER_CPU(u32, BUDDY_CPU_RQ_NR);
+extern DEFINE_PER_CPU(u32, TASK_USGAE);
+extern DEFINE_PER_CPU(u32, TASK_PERIOD);
+extern u32 PACK_FROM_CPUX_TO_CPUY_COUNT[NR_CPUS][NR_CPUS];
+extern u32 AVOID_LOAD_BALANCE_FROM_CPUX_TO_CPUY_COUNT[NR_CPUS][NR_CPUS];
+extern u32 AVOID_WAKE_UP_FROM_CPUX_TO_CPUY_COUNT[NR_CPUS][NR_CPUS];
+extern u32 TASK_PACK_CPU_COUNT[4][NR_CPUS];     // = { {0} };
+extern u32 PA_ENABLE;   // = 1;
+extern u32 PA_MON_ENABLE;       // = 0;
+extern char PA_MON[4][TASK_COMM_LEN];   // = { {0} };
 #endif /* CONFIG_MTK_SCHED_CMP_POWER_AWARE_CONTROLLER */
 
 #ifdef CONFIG_HMP_POWER_AWARE_CONTROLLER
-DEFINE_PER_CPU(u32, BUDDY_CPU_RQ_USAGE);
-DEFINE_PER_CPU(u32, BUDDY_CPU_RQ_PERIOD);
-DEFINE_PER_CPU(u32, BUDDY_CPU_RQ_NR);
-DEFINE_PER_CPU(u32, TASK_USGAE);
-DEFINE_PER_CPU(u32, TASK_PERIOD);
-u32 PACK_FROM_CPUX_TO_CPUY_COUNT[NR_CPUS][NR_CPUS];
-u32 AVOID_LOAD_BALANCE_FROM_CPUX_TO_CPUY_COUNT[NR_CPUS][NR_CPUS];
-u32 AVOID_WAKE_UP_FROM_CPUX_TO_CPUY_COUNT[NR_CPUS][NR_CPUS];
-u32 HMP_FROM_CPUX_TO_CPUY_COUNT[NR_CPUS][NR_CPUS];
-u32 PA_ENABLE = 1;
-u32 LB_ENABLE = 1;
-u32 PA_MON_ENABLE = 0;
-char PA_MON[TASK_COMM_LEN];
+extern DEFINE_PER_CPU(u32, BUDDY_CPU_RQ_USAGE);
+extern DEFINE_PER_CPU(u32, BUDDY_CPU_RQ_PERIOD);
+extern DEFINE_PER_CPU(u32, BUDDY_CPU_RQ_NR);
+extern DEFINE_PER_CPU(u32, TASK_USGAE);
+extern DEFINE_PER_CPU(u32, TASK_PERIOD);
+extern u32 PACK_FROM_CPUX_TO_CPUY_COUNT[NR_CPUS][NR_CPUS];
+extern u32 AVOID_LOAD_BALANCE_FROM_CPUX_TO_CPUY_COUNT[NR_CPUS][NR_CPUS];
+extern u32 AVOID_WAKE_UP_FROM_CPUX_TO_CPUY_COUNT[NR_CPUS][NR_CPUS];
+extern u32 HMP_FROM_CPUX_TO_CPUY_COUNT[NR_CPUS][NR_CPUS];
+extern u32 PA_ENABLE;           // = 1;
+extern u32 LB_ENABLE;           // = 1;
+extern u32 PA_MON_ENABLE;       // = 0;
+extern char PA_MON[TASK_COMM_LEN];
 
 #ifdef CONFIG_HMP_TRACER
 #define POWER_AWARE_ACTIVE_MODULE_PACK_FORM_CPUX_TO_CPUY (0)
@@ -199,7 +230,7 @@ extern unsigned int hmp_down_threshold;// = 512;
 
 
 #ifdef CONFIG_SCHED_HMP_PRIO_FILTER
-extern unsigned int hmp_up_prio = NICE_TO_PRIO(CONFIG_SCHED_HMP_PRIO_FILTER_VAL);
+extern unsigned int hmp_up_prio;        // = NICE_TO_PRIO(CONFIG_SCHED_HMP_PRIO_FILTER_VAL);
 #endif
 extern unsigned int hmp_next_up_threshold;//     = 4096;
 extern unsigned int hmp_next_down_threshold;//   = 4096;
@@ -672,7 +703,7 @@ struct hmp_domain *hmp_faster_domain(int cpu);
  * Selects a cpu in previous (faster) hmp_domain
  * Note that cpumask_any_and() returns the first cpu in the cpumask
  */
-unsigned int hmp_select_faster_cpu(struct task_struct *tsk, int cpu);
+/*public*/unsigned int hmp_select_faster_cpu(struct task_struct *tsk, int cpu);
 
 /*
  * Selects a cpu in next (slower) hmp_domain
@@ -748,6 +779,7 @@ unsigned int hmp_select_faster_cpu(struct task_struct *tsk, int cpu);
 //int hmp_packing_from_sysfs(int value);
 #endif  /*      #ifdef CONFIG_SCHED_HMP_LITTLE_PACKING  */
 
+/*
 void hmp_attr_add(
         const char *name,
         int *value,
@@ -755,7 +787,7 @@ void hmp_attr_add(
         int (*from_sysfs)(int),
         ssize_t (*to_sysfs_text)(char *, int),
         umode_t mode);
-
+*/
 
 //int hmp_attr_init(void);
 

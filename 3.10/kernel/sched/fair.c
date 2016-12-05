@@ -1500,6 +1500,7 @@ unsigned int hmp_next_down_threshold = 4096;
  */
 unsigned int hmp_packing_enabled = 1;
 unsigned int hmp_full_threshold = 650;
+
 #endif  /*  CONFIG_SCHED_HMP_LITTLE_PACKING */
 
 
@@ -9095,6 +9096,14 @@ u32 AVOID_FORCE_UP_MIGRATION_FROM_CPUX_TO_CPUY_COUNT[NR_CPUS][NR_CPUS];
 #endif /* CONFIG_HMP_POWER_AWARE_CONTROLLER */
 
 
+/*
+ * hmp_force_up_migration checks runqueues for tasks that need to
+ * be actively migrated to a faster cpu.
+ *
+ * 调用关系(CONFIG_SCHED_HMP_ENHANCEMENT)
+ * run_rebalance_domains( )
+ *  ->  hmp_force_up_migration( )
+ */
 static void hmp_force_up_migration(int this_cpu)
 {
         int curr_cpu, target_cpu;
@@ -9521,7 +9530,7 @@ static void hmp_force_up_migration(int this_cpu)
                         smp_send_reschedule(target_cpu);                    /*  发送一个IPI_RESCHEDULE 的 IPI 中断给 target_cpu */
                         return;
                 }
-                /*  刚才那个 CPU 真是小幸运,
+        /*  刚才那个 CPU 真是小幸运,
          *      正好它是小核上的 CPU
          *      并且有合适迁移到大核上的进程(负载大于阀值, 且近期未发生迁移, 进程优先级也满足阀值要求)
          *      最重要的是大核调度域上有空闲的 CPU,

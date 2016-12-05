@@ -6118,7 +6118,12 @@ out_unlock:
  * least 1 task to be running on each physical CPU where possible, and
  * avoids physical / logical imbalances.
  */
-static int active_load_balance_cpu_stop(void *data)
+#ifdef CONFIG_SCHED_HMP
+/*public*/
+#else
+static
+#endif
+int active_load_balance_cpu_stop(void *data)
 {
         return __do_active_load_balance_cpu_stop(data, true);
 }
