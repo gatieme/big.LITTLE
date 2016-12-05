@@ -2,7 +2,7 @@ all	: github
 .PHONY	: github
 
 
-GITHUB_COMMIT	:=	"修复了单个HMP模式下if-endif宏匹配的问题..."
+GITHUB_COMMIT	:=	"备份 fair.c  至完整的 hmpcb 调度算法 backup/fair_mpcb.c"
 
 github	:
 	git pull

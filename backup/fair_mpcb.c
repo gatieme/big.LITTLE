@@ -36,29 +36,33 @@
 
 #include <trace/events/sched.h>
 
+
 /*
 #define CONFIG_SMP
-#define CONFIG_CPU_IDLE
-#define CONFIG_HMP_VARIABLE_SCALE
 #define CONFIG_SCHED_HMP
+#define CONFIG_NO_HZ_COMMON
+#define CONFIG_HMP_VARIABLE_SCALE
+#define CONFIG_CPU_IDLE
+#define CONFIG_HMP_TRACER
+#define CONFIG_FAIR_GROUP_SCHED
+
+
 #define CONFIG_SCHED_HMP_ENHANCEMENT
 #define CONFIG_HMP_PACK_SMALL_TASK
 #define USE_HMP_DYNAMIC_THRESHOLD
 #define CONFIG_HMP_PACK_BUDDY_INFO
-#define CONFIG_FAIR_GROUP_SCHED
 #define CONFIG_HMP_FREQUENCY_INVARIANT_SCALE
 #define CONFIG_SCHEDSTATS
-#define CONFIG_HMP_TRACER
 #define CONFIG_HMP_POWER_AWARE_CONTROLLER
 #define CONFIG_HMP_PACK_SMALL_TASK
-#define CONFIG_NO_HZ_COMMON
+
 */
 
 
-#ifdef  CONFIG_HMP_VARIABLE_SCALE
+//#ifdef  CONFIG_HMP_VARIABLE_SCALE
 #include <linux/sysfs.h>
 #include <linux/vmalloc.h>
-#endif
+//#endif
 
 #ifdef CONFIG_HMP_FREQUENCY_INVARIANT_SCALE     /*  HMP 负载调度器需要DVFS调频支持   */
 /* Include cpufreq header to add a notifier so that cpu frequency
@@ -1466,6 +1470,37 @@ unsigned int hmp_up_prio = NICE_TO_PRIO(CONFIG_SCHED_HMP_PRIO_FILTER_VAL);
 unsigned int hmp_next_up_threshold = 4096;
 unsigned int hmp_next_down_threshold = 4096;
 
+#ifdef CONFIG_SCHED_HMP_LITTLE_PACKING
+/* 小任务封包补丁, 将负载小于NICE_0 80% 的进程, 看做是小任务
+ * 将这些小任务打包成一个任务来看待, 他们共享负载和 CPU 频率
+ * 可以查看文档 Documentation/arm/small_task_packing.txt
+ * 如果系统中小任务比较多, 那么会将这些小任务进行封包调整, 迁移到一个小核 CPU 上
+ * 直到该核上所有运行的小任务的总负载达到了 /sys/kernel/hmp/packing_limit
+ * 这些小任务就被封装成了一个任务包
+ *
+ * Set the default packing threshold to try to keep little
+ * CPUs at no more than 80% of their maximum frequency if only
+ * packing a small number of small tasks. Bigger tasks will
+ * raise frequency as normal.
+ * In order to pack a task onto a CPU, the sum of the
+ * unweighted runnable_avg load of existing tasks plus the
+ * load of the new task must be less than hmp_full_threshold.
+ *
+ * This works in conjunction with frequency-invariant load
+ * and DVFS governors. Since most DVFS governors aim for 80%
+ * utilisation, we arrive at (0.8*0.8*(max_load=1024))=655
+ * and use a value slightly lower to give a little headroom
+ * in the decision.
+ * Note that the most efficient frequency is different for
+ * each system so /sys/kernel/hmp/packing_limit should be
+ * configured at runtime for any given platform to achieve
+ * optimal energy usage. Some systems may not benefit from
+ * packing, so this feature can also be disabled at runtime
+ * with /sys/kernel/hmp/packing_enable
+ */
+unsigned int hmp_packing_enabled = 1;
+unsigned int hmp_full_threshold = 650;
+#endif  /*  CONFIG_SCHED_HMP_LITTLE_PACKING */
 
 
 
@@ -2331,7 +2366,7 @@ static inline void dequeue_entity_load_avg(struct cfs_rq *cfs_rq,
                                                   struct sched_entity *se,
                                                   int sleep)
 {
-#ifdef CONFIG_SCHED_HMP_PRIO_FILTER
+#if defined(CONFIG_SCHED_HMP_ENHANCEMENT) && defined(CONFIG_SCHED_HMP_PRIO_FILTER)
         int cpu = cfs_rq->rq->cpu;
 #endif  /*      #ifdef CONFIG_SCHED_HMP_PRIO_FILTER     */
 
@@ -2344,7 +2379,7 @@ static inline void dequeue_entity_load_avg(struct cfs_rq *cfs_rq,
 #ifdef CONFIG_SCHED_HMP_ENHANCEMENT
 //        if (entity_is_task(se)) {
 
-#ifdef CONFIG_SCHED_HMP_PRIO_FILTER
+#if defined(CONFIG_SCHED_HMP_ENHANCEMENT) && defined(CONFIG_SCHED_HMP_PRIO_FILTER)
                 cfs_reset_nr_dequeuing_low_prio(cpu);
                 if (!task_low_priority(task_of(se)->prio))
                         cfs_nr_normal_prio(cpu)--;
@@ -4143,7 +4178,7 @@ done:
         return target;
 }
 
-#if defined(CONFIG_SCHED_HMP) || defined(CONFIG_MTK_SCHED_CMP)
+#if defined(CONFIG_SCHED_HMP_ENHANCEMENT) || defined(CONFIG_MTK_SCHED_CMP)
 
 /* CPU cluster statistics for task migration control */
 #define HMP_GB (0x1000)
@@ -4573,7 +4608,161 @@ static inline struct hmp_domain *hmp_slower_domain(int cpu);
 static inline struct hmp_domain *hmp_faster_domain(int cpu);
 
 
-#ifndef  CONFIG_SCHED_HMP_ENHANCEMENT   /*      #if 0   #endif */
+
+
+
+
+
+#ifdef CONFIG_SCHED_HMP_ENHANCEMENT
+#define hmp_last_up_migration(cpu) \
+                        cpu_rq(cpu)->cfs.avg.hmp_last_up_migration
+#define hmp_last_down_migration(cpu) \
+                        cpu_rq(cpu)->cfs.avg.hmp_last_down_migration
+static int hmp_select_task_rq_fair(int sd_flag, struct task_struct *p,
+                        int prev_cpu, int new_cpu);
+#else
+static unsigned int hmp_up_migration(int cpu, int *target_cpu, struct sched_entity *se);
+static unsigned int hmp_down_migration(int cpu, struct sched_entity *se);
+#endif
+
+
+static inline unsigned int hmp_domain_min_load(struct hmp_domain *hmpd,
+                                                int *min_cpu, struct cpumask *affinity);
+
+static inline struct hmp_domain *hmp_smallest_domain(void)
+{
+        return list_entry(hmp_domains.prev, struct hmp_domain, hmp_domains);
+}
+
+/* Check if cpu is in fastest hmp_domain */
+static inline unsigned int hmp_cpu_is_fastest(int cpu)
+{
+        struct list_head *pos;
+
+        pos = &hmp_cpu_domain(cpu)->hmp_domains;
+        return pos == hmp_domains.next;
+}
+
+/* Check if cpu is in slowest hmp_domain */
+static inline unsigned int hmp_cpu_is_slowest(int cpu)
+{
+        struct list_head *pos;
+
+        pos = &hmp_cpu_domain(cpu)->hmp_domains;
+        return list_is_last(pos, &hmp_domains);
+}
+
+/* Next (slower) hmp_domain relative to cpu */
+static inline struct hmp_domain *hmp_slower_domain(int cpu)
+{
+        struct list_head *pos;
+
+        pos = &hmp_cpu_domain(cpu)->hmp_domains;
+        return list_entry(pos->next, struct hmp_domain, hmp_domains);
+}
+
+/* Previous (faster) hmp_domain relative to cpu */
+static inline struct hmp_domain *hmp_faster_domain(int cpu)
+{
+        struct list_head *pos;
+
+        pos = &hmp_cpu_domain(cpu)->hmp_domains;
+        return list_entry(pos->prev, struct hmp_domain, hmp_domains);
+}
+
+
+
+#ifdef CONFIG_SCHED_HMP_ENHANCEMENT
+
+
+/*
+ * Selects a cpu in previous (faster) hmp_domain
+ * Note that cpumask_any_and() returns the first cpu in the cpumask
+ */
+static inline unsigned int hmp_select_faster_cpu(struct task_struct *tsk,
+                                                        int cpu)
+{
+        int lowest_cpu = NR_CPUS;
+        __always_unused int lowest_ratio = hmp_domain_min_load(hmp_faster_domain(cpu), &lowest_cpu, NULL);
+        /*
+         * If the lowest-loaded CPU in the domain is allowed by the task affinity
+         * select that one, otherwise select one which is allowed
+         */
+        if (lowest_cpu < nr_cpu_ids && cpumask_test_cpu(lowest_cpu, tsk_cpus_allowed(tsk)))
+                return lowest_cpu;
+        else
+                return cpumask_any_and(&hmp_faster_domain(cpu)->cpus,
+                                tsk_cpus_allowed(tsk));
+}
+
+/*
+ * Selects a cpu in next (slower) hmp_domain
+ * Note that cpumask_any_and() returns the first cpu in the cpumask
+ */
+static inline unsigned int hmp_select_slower_cpu(struct task_struct *tsk,
+                                                        int cpu)
+{
+        int lowest_cpu = NR_CPUS;
+        __always_unused int lowest_ratio = hmp_domain_min_load(hmp_slower_domain(cpu), &lowest_cpu, NULL);
+        /*
+         * If the lowest-loaded CPU in the domain is allowed by the task affinity
+         * select that one, otherwise select one which is allowed
+         */
+        if (lowest_cpu < nr_cpu_ids && cpumask_test_cpu(lowest_cpu, tsk_cpus_allowed(tsk)))
+                return lowest_cpu;
+        else
+                return cpumask_any_and(&hmp_slower_domain(cpu)->cpus,
+                                tsk_cpus_allowed(tsk));
+}
+
+
+#else       /*  CONFIG_SCHED_HMP_ENHANCEMENT    */
+
+/*
+ * Selects a cpu in previous (faster) hmp_domain
+ */
+static inline unsigned int hmp_select_faster_cpu(struct task_struct *tsk,
+                                                        int cpu)
+{
+        int lowest_cpu=NR_CPUS;
+        __always_unused int lowest_ratio;
+        struct hmp_domain *hmp;
+
+        if (hmp_cpu_is_fastest(cpu))
+                hmp = hmp_cpu_domain(cpu);
+        else
+                hmp = hmp_faster_domain(cpu);
+
+        lowest_ratio = hmp_domain_min_load(hmp, &lowest_cpu,
+                        tsk_cpus_allowed(tsk));
+
+        return lowest_cpu;
+}
+
+/*
+ * Selects a cpu in next (slower) hmp_domain
+ * Note that cpumask_any_and() returns the first cpu in the cpumask
+ */
+static inline unsigned int hmp_select_slower_cpu(struct task_struct *tsk,
+                                                        int cpu)
+{
+        int lowest_cpu=NR_CPUS;
+        struct hmp_domain *hmp;
+        __always_unused int lowest_ratio;
+
+        if (hmp_cpu_is_slowest(cpu))
+                hmp = hmp_cpu_domain(cpu);
+        else
+                hmp = hmp_slower_domain(cpu);
+
+        lowest_ratio = hmp_domain_min_load(hmp, &lowest_cpu,
+                        tsk_cpus_allowed(tsk));
+
+        return lowest_cpu;
+}
+
+
+//#ifndef  CONFIG_SCHED_HMP_ENHANCEMENT   /*      #if 0   #endif */
 
 /* must hold runqueue lock for queue se is currently on
  * 查找并返回CPU(target_cpu)上最繁忙的进程,
@@ -4679,6 +4868,8 @@ static struct sched_entity *hmp_get_lightest_task(
 }
 
 
+#ifdef CONFIG_SCHED_HMP_LITTLE_PACKING
+
 /*
  * Select the 'best' candidate little CPU to wake up on.
  * Implements a packing strategy which examines CPU in
@@ -4720,187 +4911,11 @@ static inline unsigned int hmp_best_little_cpu(struct task_struct *tsk,
         /* if no match was found, the task uses the initial value */
         return cpu;
 }
-#endif /* #ifndef  CONFIG_SCHED_HMP_ENHANCEMENT */
+#endif  /*  CONFIG_SCHED_HMP_LITTLE_PACKING */
 
 
-#ifdef CONFIG_SCHED_HMP_LITTLE_PACKING
-/* 小任务封包补丁, 将负载小于NICE_0 80% 的进程, 看做是小任务
- * 将这些小任务打包成一个任务来看待, 他们共享负载和 CPU 频率
- * 可以查看文档 Documentation/arm/small_task_packing.txt
- * 如果系统中小任务比较多, 那么会将这些小任务进行封包调整, 迁移到一个小核 CPU 上
- * 直到该核上所有运行的小任务的总负载达到了 /sys/kernel/hmp/packing_limit
- * 这些小任务就被封装成了一个任务包
- *
- * Set the default packing threshold to try to keep little
- * CPUs at no more than 80% of their maximum frequency if only
- * packing a small number of small tasks. Bigger tasks will
- * raise frequency as normal.
- * In order to pack a task onto a CPU, the sum of the
- * unweighted runnable_avg load of existing tasks plus the
- * load of the new task must be less than hmp_full_threshold.
- *
- * This works in conjunction with frequency-invariant load
- * and DVFS governors. Since most DVFS governors aim for 80%
- * utilisation, we arrive at (0.8*0.8*(max_load=1024))=655
- * and use a value slightly lower to give a little headroom
- * in the decision.
- * Note that the most efficient frequency is different for
- * each system so /sys/kernel/hmp/packing_limit should be
- * configured at runtime for any given platform to achieve
- * optimal energy usage. Some systems may not benefit from
- * packing, so this feature can also be disabled at runtime
- * with /sys/kernel/hmp/packing_enable
- */
-unsigned int hmp_packing_enabled = 1;
-unsigned int hmp_full_threshold = 650;
-#endif
+//#endif /* #ifndef  CONFIG_SCHED_HMP_ENHANCEMENT */
 
-
-#ifdef CONFIG_SCHED_HMP_ENHANCEMENT
-#define hmp_last_up_migration(cpu) \
-                        cpu_rq(cpu)->cfs.avg.hmp_last_up_migration
-#define hmp_last_down_migration(cpu) \
-                        cpu_rq(cpu)->cfs.avg.hmp_last_down_migration
-static int hmp_select_task_rq_fair(int sd_flag, struct task_struct *p,
-                        int prev_cpu, int new_cpu);
-#else
-static unsigned int hmp_up_migration(int cpu, int *target_cpu, struct sched_entity *se);
-static unsigned int hmp_down_migration(int cpu, struct sched_entity *se);
-#endif
-
-
-static inline unsigned int hmp_domain_min_load(struct hmp_domain *hmpd,
-                                                int *min_cpu, struct cpumask *affinity);
-
-static inline struct hmp_domain *hmp_smallest_domain(void)
-{
-        return list_entry(hmp_domains.prev, struct hmp_domain, hmp_domains);
-}
-
-/* Check if cpu is in fastest hmp_domain */
-static inline unsigned int hmp_cpu_is_fastest(int cpu)
-{
-        struct list_head *pos;
-
-        pos = &hmp_cpu_domain(cpu)->hmp_domains;
-        return pos == hmp_domains.next;
-}
-
-/* Check if cpu is in slowest hmp_domain */
-static inline unsigned int hmp_cpu_is_slowest(int cpu)
-{
-        struct list_head *pos;
-
-        pos = &hmp_cpu_domain(cpu)->hmp_domains;
-        return list_is_last(pos, &hmp_domains);
-}
-
-/* Next (slower) hmp_domain relative to cpu */
-static inline struct hmp_domain *hmp_slower_domain(int cpu)
-{
-        struct list_head *pos;
-
-        pos = &hmp_cpu_domain(cpu)->hmp_domains;
-        return list_entry(pos->next, struct hmp_domain, hmp_domains);
-}
-
-/* Previous (faster) hmp_domain relative to cpu */
-static inline struct hmp_domain *hmp_faster_domain(int cpu)
-{
-        struct list_head *pos;
-
-        pos = &hmp_cpu_domain(cpu)->hmp_domains;
-        return list_entry(pos->prev, struct hmp_domain, hmp_domains);
-}
-
-#ifdef CONFIG_SCHED_HMP_ENHANCEMENT
-
-
-/*
- * Selects a cpu in previous (faster) hmp_domain
- * Note that cpumask_any_and() returns the first cpu in the cpumask
- */
-static inline unsigned int hmp_select_faster_cpu(struct task_struct *tsk,
-                                                        int cpu)
-{
-        int lowest_cpu = NR_CPUS;
-        __always_unused int lowest_ratio = hmp_domain_min_load(hmp_faster_domain(cpu), &lowest_cpu, NULL);
-        /*
-         * If the lowest-loaded CPU in the domain is allowed by the task affinity
-         * select that one, otherwise select one which is allowed
-         */
-        if (lowest_cpu < nr_cpu_ids && cpumask_test_cpu(lowest_cpu, tsk_cpus_allowed(tsk)))
-                return lowest_cpu;
-        else
-                return cpumask_any_and(&hmp_faster_domain(cpu)->cpus,
-                                tsk_cpus_allowed(tsk));
-}
-
-/*
- * Selects a cpu in next (slower) hmp_domain
- * Note that cpumask_any_and() returns the first cpu in the cpumask
- */
-static inline unsigned int hmp_select_slower_cpu(struct task_struct *tsk,
-                                                        int cpu)
-{
-        int lowest_cpu = NR_CPUS;
-        __always_unused int lowest_ratio = hmp_domain_min_load(hmp_slower_domain(cpu), &lowest_cpu, NULL);
-        /*
-         * If the lowest-loaded CPU in the domain is allowed by the task affinity
-         * select that one, otherwise select one which is allowed
-         */
-        if (lowest_cpu < nr_cpu_ids && cpumask_test_cpu(lowest_cpu, tsk_cpus_allowed(tsk)))
-                return lowest_cpu;
-        else
-                return cpumask_any_and(&hmp_slower_domain(cpu)->cpus,
-                                tsk_cpus_allowed(tsk));
-}
-
-
-#else       /*  CONFIG_SCHED_HMP_ENHANCEMENT    */
-
-/*
- * Selects a cpu in previous (faster) hmp_domain
- */
-static inline unsigned int hmp_select_faster_cpu(struct task_struct *tsk,
-                                                        int cpu)
-{
-        int lowest_cpu=NR_CPUS;
-        __always_unused int lowest_ratio;
-        struct hmp_domain *hmp;
-
-        if (hmp_cpu_is_fastest(cpu))
-                hmp = hmp_cpu_domain(cpu);
-        else
-                hmp = hmp_faster_domain(cpu);
-
-        lowest_ratio = hmp_domain_min_load(hmp, &lowest_cpu,
-                        tsk_cpus_allowed(tsk));
-
-        return lowest_cpu;
-}
-
-/*
- * Selects a cpu in next (slower) hmp_domain
- * Note that cpumask_any_and() returns the first cpu in the cpumask
- */
-static inline unsigned int hmp_select_slower_cpu(struct task_struct *tsk,
-                                                        int cpu)
-{
-        int lowest_cpu=NR_CPUS;
-        struct hmp_domain *hmp;
-        __always_unused int lowest_ratio;
-
-        if (hmp_cpu_is_slowest(cpu))
-                hmp = hmp_cpu_domain(cpu);
-        else
-                hmp = hmp_slower_domain(cpu);
-
-        lowest_ratio = hmp_domain_min_load(hmp, &lowest_cpu,
-                        tsk_cpus_allowed(tsk));
-
-        return lowest_cpu;
-}
 
 #endif  /*  CONFIG_SCHED_HMP_ENHANCEMENT    */
 
@@ -4955,6 +4970,7 @@ static inline void hmp_next_down_delay(struct sched_entity *se, int cpu)
  * delta time by 1/22 and setting load_avg_period_ms = 706.
  */
 
+
 /*
  * By scaling the delta time it end-up increasing or decrease the
  * growing speed of the per entity load_avg_ratio
@@ -4974,6 +4990,10 @@ static inline u64 hmp_variable_scale_convert(u64 delta)
         return delta;
 #endif
 }
+
+
+
+//#ifdef CONFIG_SYSTASK_INTERFACE
 
 static ssize_t hmp_show(struct kobject *kobj,
                                 struct attribute *attr, char *buf)
@@ -5069,6 +5089,9 @@ static int hmp_packing_from_sysfs(int value)
         return value;
 }
 #endif  /*      #ifdef CONFIG_SCHED_HMP_LITTLE_PACKING  */
+
+
+
 static void hmp_attr_add(
         const char *name,
         int *value,
@@ -5163,6 +5186,11 @@ static int hmp_attr_init(void)
         return 0;
 }
 late_initcall(hmp_attr_init);
+
+//#endif  /*      #ifdef CONFIG_SYSTASK_INTERFACE */
+
+
+
 /*
  * return the load of the lowest-loaded CPU in a given HMP domain
  * min_cpu optionally points to an int to receive the CPU.
@@ -5325,6 +5353,8 @@ static inline unsigned int hmp_offload_down(int cpu, struct sched_entity *se)
                 trace_sched_hmp_offload_abort(cpu,min_usage,"slowdomain");
         return NR_CPUS;
 }
+
+
 #endif /* CONFIG_SCHED_HMP */
 
 /*
@@ -5354,7 +5384,7 @@ select_task_rq_fair(struct task_struct *p, int sd_flag, int wake_flags)
         int new_cpu = cpu;
         int want_affine = 0;
         int sync = wake_flags & WF_SYNC;
-#if defined(CONFIG_SCHED_HMP) && !defined(CONFIG_SCHED_HMP_ENHANCEMENT)
+#if 0 && defined(CONFIG_SCHED_HMP) && !defined(CONFIG_SCHED_HMP_ENHANCEMENT)
         int target_cpu = nr_cpu_ids;
 #endif
 #ifdef CONFIG_MTK_SCHED_TRACERS
@@ -5586,9 +5616,9 @@ unlock:
 #ifdef CONFIG_MTK_SCHED_TRACERS
         policy |= (new_cpu << LB_HMP_SHIFT);
         policy |= LB_HMP;
-#endif
+#endif  /*  CONFIG_MTK_SCHED_TRACERS    */
 
-#else
+#else   /*  CONFIG_SCHED_HMP_ENHANCEMENT    */
         if (hmp_up_migration(prev_cpu, &new_cpu, &p->se)) {
                 hmp_next_up_delay(&p->se, new_cpu);
                 trace_sched_hmp_migrate(p, new_cpu, HMP_MIGRATE_WAKEUP);
@@ -5614,7 +5644,7 @@ unlock:
         if (!cpumask_test_cpu(new_cpu, &hmp_cpu_domain(prev_cpu)->cpus))
                 return prev_cpu;
 #endif /* CONFIG_SCHED_HMP_ENHANCEMENT */
-#endif  /*      #ifdef CONFIG_SCHED_HMP_ENHANCEMENT     */
+#endif  /*      CONFIG_SCHED_HMP     */
 #ifdef CONFIG_MTK_SCHED_TRACERS
         trace_sched_select_task_rq(p, policy, prev_cpu, new_cpu);
 #endif  /*      CONFIG_MTK_SCHED_TRACERS        */
