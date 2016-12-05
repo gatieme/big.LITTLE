@@ -59,10 +59,10 @@
 */
 
 
-#ifdef  CONFIG_HMP_VARIABLE_SCALE
+//#ifdef  CONFIG_HMP_VARIABLE_SCALE
 #include <linux/sysfs.h>
 #include <linux/vmalloc.h>
-#endif
+//#endif
 
 #ifdef CONFIG_HMP_FREQUENCY_INVARIANT_SCALE     /*  HMP 负载调度器需要DVFS调频支持   */
 /* Include cpufreq header to add a notifier so that cpu frequency
@@ -2366,7 +2366,7 @@ static inline void dequeue_entity_load_avg(struct cfs_rq *cfs_rq,
                                                   struct sched_entity *se,
                                                   int sleep)
 {
-#ifdef CONFIG_SCHED_HMP_PRIO_FILTER
+#if defined(CONFIG_SCHED_HMP_ENHANCEMENT) && defined(CONFIG_SCHED_HMP_PRIO_FILTER)
         int cpu = cfs_rq->rq->cpu;
 #endif  /*      #ifdef CONFIG_SCHED_HMP_PRIO_FILTER     */
 
@@ -2379,7 +2379,7 @@ static inline void dequeue_entity_load_avg(struct cfs_rq *cfs_rq,
 #ifdef CONFIG_SCHED_HMP_ENHANCEMENT
 //        if (entity_is_task(se)) {
 
-#ifdef CONFIG_SCHED_HMP_PRIO_FILTER
+#if defined(CONFIG_SCHED_HMP_ENHANCEMENT) && defined(CONFIG_SCHED_HMP_PRIO_FILTER)
                 cfs_reset_nr_dequeuing_low_prio(cpu);
                 if (!task_low_priority(task_of(se)->prio))
                         cfs_nr_normal_prio(cpu)--;
@@ -4970,6 +4970,7 @@ static inline void hmp_next_down_delay(struct sched_entity *se, int cpu)
  * delta time by 1/22 and setting load_avg_period_ms = 706.
  */
 
+
 /*
  * By scaling the delta time it end-up increasing or decrease the
  * growing speed of the per entity load_avg_ratio
@@ -4989,6 +4990,10 @@ static inline u64 hmp_variable_scale_convert(u64 delta)
         return delta;
 #endif
 }
+
+
+
+//#ifdef CONFIG_SYSTASK_INTERFACE
 
 static ssize_t hmp_show(struct kobject *kobj,
                                 struct attribute *attr, char *buf)
@@ -5084,6 +5089,9 @@ static int hmp_packing_from_sysfs(int value)
         return value;
 }
 #endif  /*      #ifdef CONFIG_SCHED_HMP_LITTLE_PACKING  */
+
+
+
 static void hmp_attr_add(
         const char *name,
         int *value,
@@ -5178,6 +5186,11 @@ static int hmp_attr_init(void)
         return 0;
 }
 late_initcall(hmp_attr_init);
+
+//#endif  /*      #ifdef CONFIG_SYSTASK_INTERFACE */
+
+
+
 /*
  * return the load of the lowest-loaded CPU in a given HMP domain
  * min_cpu optionally points to an int to receive the CPU.
@@ -5371,7 +5384,7 @@ select_task_rq_fair(struct task_struct *p, int sd_flag, int wake_flags)
         int new_cpu = cpu;
         int want_affine = 0;
         int sync = wake_flags & WF_SYNC;
-#if defined(CONFIG_SCHED_HMP) && !defined(CONFIG_SCHED_HMP_ENHANCEMENT)
+#if 0 && defined(CONFIG_SCHED_HMP) && !defined(CONFIG_SCHED_HMP_ENHANCEMENT)
         int target_cpu = nr_cpu_ids;
 #endif
 #ifdef CONFIG_MTK_SCHED_TRACERS
