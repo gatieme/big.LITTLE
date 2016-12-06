@@ -9218,7 +9218,6 @@ static void hmp_force_up_migration(int this_cpu)
                         spin_unlock(&hmp_force_migration);
                         smp_send_reschedule(target_cpu);                    /*  发送一个IPI_RESCHEDULE 的 IPI 中断给 target_cpu */
                 }
-        }
 #else   /*      直接进行向上迁移                                        */
                         if (p->state != TASK_DEAD) {    /*      如果当前 CPU 仍然活跃   */
                                 target->active_balance = 1; /* force up */
@@ -9229,6 +9228,8 @@ static void hmp_force_up_migration(int this_cpu)
                                 hmp_next_up_delay(&p->se, target->push_cpu);
                         }
                 }
+
+#endif  /*      #if CONFIG_HMP_DELAY_UP_MIGRATION       */
 
 #ifdef CONFIG_HMP_LAZY_BALANCE
 out_force_up:
@@ -9247,7 +9248,6 @@ out_force_up:
                 }
         }
 
-#endif  /*      #if CONFIG_HMP_DELAY_UP_MIGRATION       */
 
 #ifdef CONFIG_HMP_GLOBAL_BALANCE
         hmp_force_down_migration(this_cpu);
