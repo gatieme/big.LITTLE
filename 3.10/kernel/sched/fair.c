@@ -9208,22 +9208,23 @@ static void hmp_force_up_migration(int this_cpu)
                 if (!target->active_balance &&
                         hmp_up_migration(curr_cpu, &target_cpu, se, &clbenv) && /*      检查当前小核 CPU(curr_cpu) 上的进程实体 se 是否满足迁移到大核 CPU(target_cpu) 的条件   */
                         !cpu_park(cpu_of(target))) {                            /*      */
-                        if (p->state != TASK_DEAD) {    /*      如果当前 CPU 仍然活跃   */
 #ifdef CONFIG_HMP_DELAY_UP_MIGRATION
 ////////////////////////////////////////////////////////////////////////////////
 #warning "you use delay up migration(non force up night now) in CONFIG_SCHED_HMP_ENHANCEMENT which may have much BUGS..."
 ////////////////////////////////////////////////////////////////////////////////
-                                /*      由于大核可能多数在睡眠中, 因此我们延迟向上迁移的过程,   */
-                                cpu_rq(target_cpu)->wake_for_idle_pull = 1;         /*  设置将要迁移的目标 CPU(target_cpu) 运行队列上的 wake_for_idle_pull 标志位  */
-                                raw_spin_unlock_irqrestore(&target->lock, flags);
-                                spin_unlock(&hmp_force_migration);
-                                smp_send_reschedule(target_cpu);                    /*  发送一个IPI_RESCHEDULE 的 IPI 中断给 target_cpu */
+                        /*      由于大核可能多数在睡眠中, 因此我们延迟向上迁移的过程,   */
+                        cpu_rq(target_cpu)->wake_for_idle_pull = 1;         /*  设置将要迁移的目标 CPU(target_cpu) 运行队列上的 wake_for_idle_pull 标志位  */
+                        raw_spin_unlock_irqrestore(&target->lock, flags);
+                        spin_unlock(&hmp_force_migration);
+                        smp_send_reschedule(target_cpu);                    /*  发送一个IPI_RESCHEDULE 的 IPI 中断给 target_cpu */
+                }
+        }
 #else   /*      直接进行向上迁移                                        */
-
+                        if (p->state != TASK_DEAD) {    /*      如果当前 CPU 仍然活跃   */
                                 target->active_balance = 1; /* force up */
                                 target->push_cpu = target_cpu;
                                 target->migrate_task = p;
-                                force = 1;
+                                force = 1;      /*      强制迁移      */
                                 trace_sched_hmp_migrate(p, target->push_cpu, 1);
                                 hmp_next_up_delay(&p->se, target->push_cpu);
                         }
@@ -9244,8 +9245,9 @@ out_force_up:
                                 raw_spin_unlock_irqrestore(&target->lock, flags);
                         }
                 }
-#endif  /*      #if CONFIG_HMP_DELAY_UP_MIGRATION       */
         }
+
+#endif  /*      #if CONFIG_HMP_DELAY_UP_MIGRATION       */
 
 #ifdef CONFIG_HMP_GLOBAL_BALANCE
         hmp_force_down_migration(this_cpu);
@@ -9802,7 +9804,8 @@ static void run_rebalance_domains(struct softirq_action *h)
         enum cpu_idle_type idle = this_rq->idle_balance ?
                                                 CPU_IDLE : CPU_NOT_IDLE;
 
-#ifdef CONFIG_SCHED_HMP
+//#ifdef CONFIG_SCHED_HMP
+#ifdef CONFIG_HMP_DELAY_UP_MIGRATION
         /* shortcut for hmp idle pull wakeups
         *
         * 首先检查当前CPU运行队列的wake_for_idle_pull 标识
@@ -9820,7 +9823,8 @@ static void run_rebalance_domains(struct softirq_action *h)
                                 return;
                 }
         }
-#endif  /*      #ifdef CONFIG_SCHED_HMP */
+#endif  /*      #ifdef CONFIG_HMP_DELAY_UP_MIGRATION    */
+//#endif  /*      #ifdef CONFIG_SCHED_HMP */
 
         hmp_force_up_migration(this_cpu);
 
