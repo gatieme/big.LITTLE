@@ -7623,9 +7623,20 @@ more_balance:
                         raw_spin_unlock_irqrestore(&busiest->lock, flags);
 
                         if (active_balance) {
+#ifdef CONFIG_HMP_PACK_STOP_MACHINE
+                                if (stop_one_cpu_dispatch(cpu_of(busiest),
+                                        active_load_balance_cpu_stop, busiest,
+                                        &busiest->active_balance_work)) {
+                                        raw_spin_lock_irqsave(&busiest->lock, flags);
+                                        busiest->active_balance = 0;
+                                        //force = 0;
+                                        raw_spin_unlock_irqrestore(&busiest->lock, flags);
+                                }
+#else
                                 stop_one_cpu_nowait(cpu_of(busiest),
                                         active_load_balance_cpu_stop, busiest,
                                         &busiest->active_balance_work);
+#endif  /*      #ifdef CONFIG_HMP_PACK_STOP_MACHINE     */
                         }
 
                         /*
@@ -9086,9 +9097,12 @@ static void hmp_force_down_migration(int this_cpu)
                 sched_update_clbstats(&clbenv);
 
                 /* Check migration threshold */
-                if (!target->active_balance &&
-                        hmp_down_migration(curr_cpu, &target_cpu, se, &clbenv) &&
-                        !cpu_park(cpu_of(target))) {
+                if (!target->active_balance
+                        && hmp_down_migration(curr_cpu, &target_cpu, se, &clbenv)
+#ifdef CONFIG_HMP_PACK_STOP_MACHINE     /*      && defined(CONFIG_SCHED_HMP_ENHANCEMENT)        */
+                        && !cpu_park(cpu_of(target))
+#endif  /*      #ifdef CONFIG_HMP_PACK_STOP_MACHINE && defined(CONFIG_SCHED_HMP_ENHANCEMENT)        */
+                                                ) {
                         if (p->state != TASK_DEAD) {
                                 target->active_balance = 1; /* force down */
                                 target->push_cpu = target_cpu;
@@ -9100,6 +9114,7 @@ static void hmp_force_down_migration(int this_cpu)
                 }
                 raw_spin_unlock_irqrestore(&target->lock, flags);
                 if (force) {
+#ifdef CONFIG_HMP_PACK_STOP_MACHINE
                         if (stop_one_cpu_dispatch(cpu_of(target),
                                 hmp_active_task_migration_cpu_stop,
                                 target, &target->active_balance_work)) {
@@ -9108,6 +9123,11 @@ static void hmp_force_down_migration(int this_cpu)
                                 force = 0;
                                 raw_spin_unlock_irqrestore(&target->lock, flags);
                         }
+#else
+                        stop_one_cpu_nowait(cpu_of(target),
+                                hmp_active_task_migration_cpu_stop,
+                                target, &target->active_balance_work);  /*  暂停迁移源 CPU 后, 强行进行迁移 */
+#endif  /*      #ifdef CONFIG_HMP_PACK_STOP_MACHINE     */
                 }
         }
 }
@@ -9215,9 +9235,12 @@ static void hmp_force_up_migration(int this_cpu)
 #endif                          /* CONFIG_HMP_LAZY_BALANCE */
 
                 /* Check migration threshold */
-                if (!target->active_balance &&                                  /*      同一个时间单个 CPU 上只能完成一个任务迁移, 此时 CPU 调度队列的 active_balance 被设置   */
-                        hmp_up_migration(curr_cpu, &target_cpu, se, &clbenv) && /*      检查当前小核 CPU(curr_cpu) 上的进程实体 se 是否满足迁移到大核 CPU(target_cpu) 的条件   */
-                        !cpu_park(cpu_of(target))) {                            /*      当前 CPU 没有被 stop       */
+                if (!target->active_balance     /*      同一个时间单个 CPU 上只能完成一个任务迁移, 此时 CPU 调度队列的 active_balance 被设置   */
+                        && hmp_up_migration(curr_cpu, &target_cpu, se, &clbenv) /*      检查当前小核 CPU(curr_cpu) 上的进程实体 se 是否满足迁移到大核 CPU(target_cpu) 的条件   */
+#ifdef CONFIG_HMP_PACK_STOP_MACHINE     /*      && defined(CONFIG_SCHED_HMP_ENHANCEMENT)        */
+                        && !cpu_park(cpu_of(target))            /*      当前 CPU 没有被 stop       */
+#endif  /*      #ifdef CONFIG_HMP_PACK_STOP_MACHINE && defined(CONFIG_SCHED_HMP_ENHANCEMENT)        */
+                                                ) {
 #ifdef CONFIG_HMP_DELAY_UP_MIGRATION
 ////////////////////////////////////////////////////////////////////////////////
 #warning "you use delay up migration(non force up night now) in CONFIG_SCHED_HMP_ENHANCEMENT which may have much BUGS..."
@@ -9247,6 +9270,7 @@ out_force_up:
 
                 raw_spin_unlock_irqrestore(&target->lock, flags);
                 if (force) {
+#ifdef CONFIG_HMP_PACK_STOP_MACHINE
                         if (stop_one_cpu_dispatch(cpu_of(target),
                                 hmp_active_task_migration_cpu_stop,
                                 target, &target->active_balance_work)) {
@@ -9255,6 +9279,11 @@ out_force_up:
                                 force = 0;
                                 raw_spin_unlock_irqrestore(&target->lock, flags);
                         }
+#else
+                        stop_one_cpu_nowait(cpu_of(target),
+                                hmp_active_task_migration_cpu_stop,
+                                target, &target->active_balance_work);  /*  暂停迁移源 CPU 后, 强行进行迁移 */
+#endif  /*      #ifdef CONFIG_HMP_PACK_STOP_MACHINE     */
                 }
         }
 
@@ -9377,9 +9406,12 @@ static unsigned int hmp_idle_pull(int this_cpu)
 #endif                          /* CONFIG_HMP_LAZY_BALANCE */
 
                 /* Check migration threshold */
-                if (!target->active_balance &&                                  /*      同一个时间单个 CPU 上只能完成一个任务迁移, 此时 CPU 调度队列的 active_balance 被设置   */
-                        hmp_up_migration(curr_cpu, &target_cpu, se, &clbenv) && /*      检查当前小核 CPU(curr_cpu) 上的进程实体 se 是否满足迁移到大核 CPU(target_cpu) 的条件   */
-                        !cpu_park(cpu_of(target))) {                            /*      当前 CPU 没有被 stop       */
+                if (!target->active_balance                             /*      同一个时间单个 CPU 上只能完成一个任务迁移, 此时 CPU 调度队列的 active_balance 被设置   */
+                        && hmp_up_migration(curr_cpu, &target_cpu, se, &clbenv) /*      检查当前小核 CPU(curr_cpu) 上的进程实体 se 是否满足迁移到大核 CPU(target_cpu) 的条件   */
+#ifdef CONFIG_HMP_PACK_STOP_MACHINE     /*      && defined(CONFIG_SCHED_HMP_ENHANCEMENT)        */
+                        && !cpu_park(cpu_of(target))                    /*      当前 CPU 没有被 stop       */
+#endif  /*      #ifdef CONFIG_HMP_PACK_STOP_MACHINE && defined(CONFIG_SCHED_HMP_ENHANCEMENT)        */
+                                                        ) {
 
                         if (p->state != TASK_DEAD) {            /*      如果当前 CPU 仍然活跃   */
                                 target->active_balance = 1;
@@ -9398,6 +9430,7 @@ out_force_up:
                 raw_spin_unlock_irqrestore(&target->lock, flags);
                 if (force) {
                         hmp_cpu_keepalive_trigger( );           /*      为大核设置保活监控定时器(add by gatieme(ChengJean))        */
+#ifdef CONFIG_HMP_PACK_STOP_MACHINE
                         if (stop_one_cpu_dispatch(cpu_of(target),
                                 hmp_active_task_migration_cpu_stop,
                                 target, &target->active_balance_work)) {
@@ -9406,6 +9439,11 @@ out_force_up:
                                 force = 0;
                                 raw_spin_unlock_irqrestore(&target->lock, flags);
                         }
+#else
+                        stop_one_cpu_nowait(cpu_of(target),
+                                hmp_active_task_migration_cpu_stop,
+                                target, &target->active_balance_work);  /*  暂停迁移源 CPU 后, 强行进行迁移 */
+#endif  /*      #ifdef CONFIG_HMP_PACK_STOP_MACHINE     */
                 }
         }
 
@@ -9738,9 +9776,20 @@ static void hmp_force_up_migration(int this_cpu)
                         raw_spin_unlock_irqrestore(&target->lock, flags);
 
                         if (force) {              /*  依照前面所述, 待迁移的进程 p 正在运行中, 则 force被置为 1 */
+#ifdef CONFIG_HMP_PACK_STOP_MACHINE
+                                if (stop_one_cpu_dispatch(cpu_of(target),
+                                        hmp_active_task_migration_cpu_stop,
+                                        target, &target->active_balance_work)) {
+                                        raw_spin_lock_irqsave(&target->lock, flags);
+                                        target->active_balance = 0;
+                                        force = 0;
+                                        raw_spin_unlock_irqrestore(&target->lock, flags);
+                                }
+#else
                                 stop_one_cpu_nowait(cpu_of(target),
                                         hmp_active_task_migration_cpu_stop,
                                         target, &target->active_balance_work);  /*  暂停迁移源 CPU 后, 强行进行迁移 */
+#endif  /*      #ifdef CONFIG_HMP_PACK_STOP_MACHINE     */
                         }
                         spin_unlock(&hmp_force_migration);
 #endif  /*      #ifdef CONFIG_HMP_DELAY_UP_MIGRATION       */
@@ -9819,11 +9868,23 @@ static void hmp_force_up_migration(int this_cpu)
 
                 raw_spin_unlock_irqrestore(&target->lock, flags);
 
-                if (force)              /*  依照前面所述, 待迁移的进程 p 正在运行中, 则 force被置为 1 */
+                if (force) {              /*  依照前面所述, 待迁移的进程 p 正在运行中, 则 force被置为 1 */
+#ifdef CONFIG_HMP_PACK_STOP_MACHINE
+                        if (stop_one_cpu_dispatch(cpu_of(target),
+                                hmp_active_task_migration_cpu_stop,
+                                target, &target->active_balance_work)) {
+                                raw_spin_lock_irqsave(&target->lock, flags);
+                                target->active_balance = 0;
+                                force = 0;
+                                raw_spin_unlock_irqrestore(&target->lock, flags);
+                        }
+#else
                         stop_one_cpu_nowait(cpu_of(target),
                                 hmp_active_task_migration_cpu_stop,
                                 target, &target->active_balance_work);  /*  暂停迁移源 CPU 后, 强行进行迁移 */
-        /*  自此我们了解到, 如果*/
+#endif  /*      #ifdef CONFIG_HMP_PACK_STOP_MACHINE     */
+                }
+                /*  自此我们了解到, 如果*/
         }
         spin_unlock(&hmp_force_migration);
 }
@@ -9928,9 +9989,20 @@ static unsigned int hmp_idle_pull(int this_cpu)
         if (force) {
                 /* start timer to keep us awake */
                 hmp_cpu_keepalive_trigger();                    /*  为大核设置保活监控定时器  */
+#ifdef CONFIG_HMP_PACK_STOP_MACHINE
+                if (stop_one_cpu_dispatch(cpu_of(target),
+                        hmp_active_task_migration_cpu_stop,
+                        target, &target->active_balance_work)) {
+                        raw_spin_lock_irqsave(&target->lock, flags);
+                        target->active_balance = 0;
+                        force = 0;
+                        raw_spin_unlock_irqrestore(&target->lock, flags);
+                }
+#else
                 stop_one_cpu_nowait(cpu_of(target),             /*  如果迁移进程正在运行, 那么和之前一样, 调用 stop_one_cpu_nowait( ) 函数强行迁移  */
                         hmp_active_task_migration_cpu_stop,
                         target, &target->active_balance_work);
+#endif  /*      #ifdef CONFIG_HMP_PACK_STOP_MACHINE     */
         }
 done:
         spin_unlock(&hmp_force_migration);

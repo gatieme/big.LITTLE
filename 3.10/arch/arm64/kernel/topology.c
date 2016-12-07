@@ -312,7 +312,7 @@ unsigned long max_capacity = 0;
 #ifdef  CONFIG_SCHED_HMP_ENHANCEMENT    /*      add by gatieme(ChengJean) @ 2016-12-01 20:15    */
 static void __init parse_dt_topology(void)
 {
-    struct cpu_efficiency *cpu_eff;
+    const struct cpu_efficiency *cpu_eff;
     struct device_node *cn = NULL;
     unsigned long capacity = 0;
     int alloc_size, cpu = 0;
@@ -441,6 +441,7 @@ out:
 	return ret;
 }
 #endif
+
 
 static void __init parse_dt_cpu_power(void)
 {
@@ -749,7 +750,6 @@ void __init init_cpu_topology(void)
 	smp_wmb();
 
 	parse_dt_topology();
-
 	cpu_topology_init = 1;
 
 }

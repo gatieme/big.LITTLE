@@ -235,12 +235,12 @@ config SCHED_SMT
 #----------------------------------------------
 
 config DISABLE_CPU_SCHED_DOMAIN_BALANCE
-	bool "(EXPERIMENTAL-HMP) Disable CPU level scheduler load-balancing"
+	bool "(LINARO-HMP) Disable CPU level scheduler load-balancing"
 	help
 	  Disables scheduler load-balancing at CPU sched domain level.
 
 config SCHED_HMP
-	bool "(EXPERIMENTAL-HMP) Heterogenous multiprocessor scheduling"
+	bool "(LINARO-HMP) Heterogenous multiprocessor scheduling"
 	depends on DISABLE_CPU_SCHED_DOMAIN_BALANCE && SCHED_MC && FAIR_GROUP_SCHED && !SCHED_AUTOGROUP
 	help
 	  Experimental scheduler optimizations for heterogeneous platforms.
@@ -252,7 +252,7 @@ config SCHED_HMP
 	  between cpus of different type (DISABLE_CPU_SCHED_DOMAIN_BALANCE).
 
 config SCHED_HMP_PRIO_FILTER
-	bool "(EXPERIMENTAL-HMP) Filter HMP migrations by task priority"
+	bool "(LINARO-HMP) Filter HMP migrations by task priority"
 	depends on SCHED_HMP
 	help
 	  Enables task priority based HMP migration filter. Any task with
@@ -260,12 +260,12 @@ config SCHED_HMP_PRIO_FILTER
 	  with less compute capacity.
 
 config SCHED_HMP_PRIO_FILTER_VAL
-	int "(EXPERIMENTAL-HMP) NICE priority threshold"
+	int "(LINARO-HMP) NICE priority threshold"
 	default 5
 	depends on SCHED_HMP_PRIO_FILTER
 
 config HMP_FAST_CPU_MASK
-	string "(EXPERIMENTAL-HMP) HMP scheduler fast CPU mask"
+	string "(LINARO-HMP) HMP scheduler fast CPU mask"
 	depends on SCHED_HMP
 	help
           Leave empty to use device tree information.
@@ -273,7 +273,7 @@ config HMP_FAST_CPU_MASK
 	  e.g. cpuid 0+1 should be specified as 0-1.
 
 config HMP_SLOW_CPU_MASK
-	string "(EXPERIMENTAL-HMP) HMP scheduler slow CPU mask"
+	string "(LINARO-HMP) HMP scheduler slow CPU mask"
 	depends on SCHED_HMP
 	help
 	  Leave empty to use device tree information.
@@ -281,7 +281,7 @@ config HMP_SLOW_CPU_MASK
 	  e.g. cpuid 0+1 should be specified as 0-1.
 
 config HMP_VARIABLE_SCALE
-	bool "(EXPERIMENTAL-HAP) Allows changing the load tracking scale through sysfs"
+	bool "(LINARO-HMP) Allows changing the load tracking scale through sysfs"
 	depends on SCHED_HMP
 	help
 	  When turned on, this option exports the thresholds and load average
@@ -304,7 +304,7 @@ config HMP_VARIABLE_SCALE
 	  but it remove intermadiate overflows in computation.
 
 config HMP_FREQUENCY_INVARIANT_SCALE
-	bool "(EXPERIMENTAL-HMP) Frequency-Invariant Tracked Load for HMP"
+	bool "(LINARO-HMP) Frequency-Invariant Tracked Load for HMP"
         depends on HMP_VARIABLE_SCALE && CPU_FREQ && !ARCH_SCALE_INVARIANT_CPU_CAPACITY
         help
 	  Scales the current load contribution in line with the frequency
@@ -321,7 +321,7 @@ config HMP_FREQUENCY_INVARIANT_SCALE
 
 
 config SCHED_HMP_LITTLE_PACKING
-	bool "(EXPERIMENTAL-HMP)Small task packing for HMP"
+	bool "(LINARO-HMP)Small task packing for HMP"
 	depends on SCHED_HMP
 	default n
 	help
@@ -332,19 +332,17 @@ config SCHED_HMP_LITTLE_PACKING
 	  packing_limit: runqueue load ratio where a RQ is considered
 	    to be full. Default is NICE_0_LOAD * 9/8.
 
-config HMP_TRACER
-	bool "(EXPERIMENTAL-HMP) Profile HMP scheduler"
-	depends on SCHED_HMP
-        help
-	  Profile HMP scheduler
-
-
 # add by gatieme(ChengJean) for SCHED_HMP_ENHANCEMENT
 # begin 2016-12-01 16:25
 
 #----------------------------------------------
 # pack configs for CONFIG_SCHED_HMP
 #----------------------------------------------
+config HMP_TRACER
+	bool "(EXPERIMENTAL-HMP) Profile HMP scheduler"
+	depends on SCHED_HMP
+        help
+	  Profile HMP scheduler
 
 config HEVTASK_INTERFACE
 	bool "(EXPERIMENTAL-HMP)task status interface"
@@ -379,6 +377,13 @@ config HMP_DELAY_UP_MIGRATION
           a task when ready. This allows the task to continue executing on its
           current CPU, reducing the amount of time that the task is stalled for.
 
+config HMP_PACK_STOP_MACHINE
+        bool "(EXPERIMENTAL-HMP) Packing HMP-stop machine"
+        depends on SCHED_HMP
+        help
+         This option enables Packing stop machine at the time of need
+         add    by gatieme(ChengJean) @ 2012-12-03 22:16 for support CONFIG_SCHED_HMP_ENHANCEMENT
+         modify by gatieme(ChengJean) @ 2012-12-07 18:10 for support CONFIG_SCHED_HMP
 
 #----------------------------------------------
 # pack configs for CONFIG_SCHED_HMP_ENHANCEMENT
@@ -432,12 +437,6 @@ config HMP_PACK_BUDDY_INFO
 	help
 		This option enables Packing Small Tasks Buddy Information Log
 
-config HMP_PACK_STOP_MACHINE
-        bool "(EXPERIMENTAL-HMPCB) Packing HMP-stop machine"
-        depends on SCHED_HMP_ENHANCEMENT
-        help
-                This option enables Packing stop machine at the time of need
-                add by gatieme(ChengJean) @ 2012-12-03 22:16
 
 config HMP_LAZY_BALANCE
 	bool "(EXPERIMENTAL-HMPCB) Lazy Balance"

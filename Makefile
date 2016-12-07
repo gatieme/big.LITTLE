@@ -2,7 +2,7 @@ all	: github
 .PHONY	: github
 
 
-GITHUB_COMMIT	:=	"继续完善 CONFIG_HMP_DELAY_UP_MIGRATION 宏, 发现warning: ‘hmp_cpu_keepalive_trigger’ defined but not used [-Wunused-function]..."
+GITHUB_COMMIT	:=	"继续完善 arm64 的 hmpcb 负载均衡调度器, 完善 STOP_MACHINE 机制..."
 
 github	:
 	git pull
