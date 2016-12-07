@@ -7671,9 +7671,11 @@ out:
 }
 
 #ifdef CONFIG_SCHED_HMP
+#ifdef CONFIG_HMP_DELAY_UP_MIGRATION
 static unsigned int hmp_idle_pull(int this_cpu);
+#endif  /*      #ifdef CONFIG_HMP_DELAY_UP_MIGRATION    */
 static int move_specific_task(struct lb_env *env, struct task_struct *pm);
-#else
+#else   /*      #ifdef CONFIG_SCHED_HMP */
 static int move_specific_task(struct lb_env *env, struct task_struct *pm)
 {
         return 0;
@@ -7746,7 +7748,7 @@ must_do:
         rcu_read_unlock();
 
 /* (add by gatieme(ChengJean))     */
-#ifdef  defined(CONFIG_HMP_DELAY_UP_MIGRATION)  /*      && defined(CONFIG_SCHED_HMP)    */
+#ifdef  CONFIG_HMP_DELAY_UP_MIGRATION  /*      && defined(CONFIG_SCHED_HMP)    */
         if (!pulled_task)
                 pulled_task = hmp_idle_pull(this_cpu);
 #endif  /*      #ifdef  defined(CONFIG_HMP_DELAY_UP_MIGRATION)  */

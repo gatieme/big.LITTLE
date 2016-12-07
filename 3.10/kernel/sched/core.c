@@ -1408,7 +1408,7 @@ void scheduler_ipi(void)
 	if (llist_empty(&this_rq()->wake_list)
 			&& !tick_nohz_full_cpu(smp_processor_id())
 			&& !got_nohz_idle_kick()
-#ifdef CONFIG_SCHED_HMP
+#ifdef  CONFIG_HMP_DELAY_UP_MIRGATION   /*      && defined(CONFIG_SCHED_HMP)    */
 			&& !this_rq()->wake_for_idle_pull
 #endif
 			)
@@ -1438,7 +1438,7 @@ void scheduler_ipi(void)
 		this_rq()->idle_balance = 1;
 		raise_softirq_irqoff(SCHED_SOFTIRQ);
 	}
-#ifdef CONFIG_SCHED_HMP
+#ifdef  CONFIG_HMP_DELAY_UP_MIRGATION   /*      && defined(CONFIG_SCHED_HMP)    */
 	else if (unlikely(this_rq()->wake_for_idle_pull))
 		raise_softirq_irqoff(SCHED_SOFTIRQ);
 #endif
