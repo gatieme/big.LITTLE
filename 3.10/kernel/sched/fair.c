@@ -7712,6 +7712,9 @@ void idle_balance(int this_cpu, struct rq *this_rq)
                 return;
         }
 
+#if defined(CONFIG_MT_LOAD_BALANCE_ENHANCEMENT) && defined(CONFIG_LOCAL_TIMERS)
+must_do:
+#endif
         /*
          * Drop the rq->lock, but keep IRQ/preempt disabled.
          */
@@ -7741,10 +7744,13 @@ void idle_balance(int this_cpu, struct rq *this_rq)
                 }
         }
         rcu_read_unlock();
-#ifdef CONFIG_SCHED_HMP /*      && defined(CONFIG_HMP_DELAY_UP_MIGRATION)       (add by gatieme(ChengJean))*/
+
+/* (add by gatieme(ChengJean))     */
+#ifdef  defined(CONFIG_HMP_DELAY_UP_MIGRATION)  /*      && defined(CONFIG_SCHED_HMP)    */
         if (!pulled_task)
                 pulled_task = hmp_idle_pull(this_cpu);
-#endif
+#endif  /*      #ifdef  defined(CONFIG_HMP_DELAY_UP_MIGRATION)  */
+
         raw_spin_lock(&this_rq->lock);
 
         if (pulled_task || time_after(jiffies, this_rq->next_balance)) {
@@ -9262,14 +9268,16 @@ out_force_up:
 }
 
 
-//#ifdef CONFIG_HMP_DELAY_UP_MIGRATION
+#ifdef CONFIG_HMP_DELAY_UP_MIGRATION    /*      && defined(CONFIG_SCHED_HMP_ENHANCEMENT)        */
 /*
  * hmp_idle_pull looks at little domain runqueues to see
  * if a task should be pulled.
  *
  * Reuses hmp_force_migration spinlock.
  *
- * add by gatieme(ChengJean) for CONFIG_HMP_DELAY_UP_MIGRATION
+ * add by gatieme(ChengJean) for
+ *      CONFIG_SCHED_HMP_ENHANCEMENT
+ *              CONFIG_HMP_DELAY_UP_MIGRATION
  */
 static unsigned int hmp_idle_pull(int this_cpu)
 {
@@ -9820,7 +9828,7 @@ static void hmp_force_up_migration(int this_cpu)
 
 
 
-//#ifdef CONFIG_HMP_DELAY_UP_MIGRATION
+#ifdef CONFIG_HMP_DELAY_UP_MIGRATION    /*      && defined(CONFIG_SCHED_HMP)    */
 /*
  * hmp_idle_pull looks at little domain runqueues to see
  * if a task should be pulled.
@@ -9926,7 +9934,7 @@ done:
         spin_unlock(&hmp_force_migration);
         return force;
 }
-//#endif  /*      #ifdef CONFIG_HMP_DELAY_UP_MIGRATION    */
+#endif  /*      #ifdef CONFIG_HMP_DELAY_UP_MIGRATION    */
 
 
 #else   /* CONFIG_SCHED_HMP_ENHANCEMENT */

@@ -2,7 +2,7 @@ all	: github
 .PHONY	: github
 
 
-GITHUB_COMMIT	:=	"继续完善 CONFIG_HMP_DELAY_UP_MIGRATION 宏, 为 hmpcb 负载均衡调度器增加的 hmp_idle_pull 函数..."
+GITHUB_COMMIT	:=	"继续完善 CONFIG_HMP_DELAY_UP_MIGRATION 宏, 将 hmp_idle_pull 函数包含在宏内部..."
 
 github	:
 	git pull
