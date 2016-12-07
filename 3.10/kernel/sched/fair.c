@@ -7741,7 +7741,7 @@ void idle_balance(int this_cpu, struct rq *this_rq)
                 }
         }
         rcu_read_unlock();
-#ifdef CONFIG_SCHED_HMP
+#ifdef CONFIG_SCHED_HMP /*      && defined(CONFIG_HMP_DELAY_UP_MIGRATION)       (add by gatieme(ChengJean))*/
         if (!pulled_task)
                 pulled_task = hmp_idle_pull(this_cpu);
 #endif
@@ -9262,18 +9262,153 @@ out_force_up:
 }
 
 
+//#ifdef CONFIG_HMP_DELAY_UP_MIGRATION
 /*
  * hmp_idle_pull looks at little domain runqueues to see
  * if a task should be pulled.
  *
  * Reuses hmp_force_migration spinlock.
  *
+ * add by gatieme(ChengJean) for CONFIG_HMP_DELAY_UP_MIGRATION
  */
 static unsigned int hmp_idle_pull(int this_cpu)
 {
-    //  need rewrite
-    return -1;
+        ///////////////////////////////////////////////////
+        ///     need overwrite
+        ///////////////////////////////////////////////////
+        int curr_cpu, target_cpu;
+        struct sched_entity *se = NULL;
+        struct rq *target = NULL;
+        unsigned long flags;
+        unsigned int force = 0;
+        struct task_struct *p = NULL;
+        struct clb_env clbenv;
+#ifdef CONFIG_HMP_POWER_AWARE_CONTROLLER
+        int push_cpu;
+#endif  /*     ONFIG_HMP_POWER_AWARE_CONTROLLER */
+
+        //if (!hmp_cpu_is_slowest(this_cpu))      /*  如果当前 CPU 不是小核 */
+        //        hmp_domain = hmp_slower_domain(this_cpu);   /*  如果不是小核(是大核), 则取出小核的 domain 结构  */
+        //if (!hmp_domain)
+        //        return 0;
+
+        if (!spin_trylock(&hmp_force_migration))
+                return 0;
+
+#ifdef CONFIG_HMP_TRACER
+        for_each_online_cpu(curr_cpu)
+            trace_sched_cfs_runnable_load(curr_cpu, cfs_load(curr_cpu), cfs_length(curr_cpu));
+#endif  /*      #ifdef CONFIG_HMP_TRACER        */
+
+        /* Migrate heavy task from LITTLE to big */
+        for_each_cpu(curr_cpu, &hmp_slow_cpu_mask) {    /*      遍历所有的小核  */
+                /* Check whether CPU is online */
+                if (!cpu_online(curr_cpu))              /*      跳过所有非活跃的CPU     */
+                        continue;
+
+                force = 0;
+                target = cpu_rq(curr_cpu);
+                raw_spin_lock_irqsave(&target->lock, flags);
+                se = target->cfs.curr;
+                if (!se) {
+                        raw_spin_unlock_irqrestore(&target->lock, flags);
+                        continue;
+                }
+
+                /* Find task entity
+                 * 如果当前运行的调度实体 se 不是一个进程, 而是一个进程组 group 标识
+                 * 则从中取出当前正在运行的进程的信息   */
+                if (!entity_is_task(se)) {
+                        struct cfs_rq *cfs_rq;
+                        cfs_rq = group_cfs_rq(se);
+                        while (cfs_rq) {
+                                se = cfs_rq->curr;
+                                cfs_rq = group_cfs_rq(se);
+                        }
+                }
+                /*      检查是否可以进行向上迁移, 主要执行如下操作
+                 *      hmp_select_cpu 从大核 fast_cpu 的调度域中选择一个合适的 CPU(target_cpu) 以供进程迁移
+                 *      */
+                p = task_of(se);        /* get task_struct, 获取到调度实体 se 的 task_struct 信息*/
+                target_cpu = hmp_select_cpu(HMP_GB, p, &hmp_fast_cpu_mask, -1); /*      从大核的调度域中找到一个合适的 CPU 以供进程 p 运行      */
+                if (NR_CPUS == target_cpu) {            /*      未找到合适的 CPU 时, 返回 NR_CPUS       */
+                        raw_spin_unlock_irqrestore(&target->lock, flags);
+                        continue;
+                }
+
+                /* Collect cluster information 收集 CPU 簇的信息 */
+                memset(&clbenv, 0, sizeof(clbenv));
+                clbenv.flags |= HMP_GB;
+                clbenv.ltarget = curr_cpu;
+                clbenv.btarget = target_cpu;
+                cpumask_copy(&clbenv.lcpus, &hmp_slow_cpu_mask);
+                cpumask_copy(&clbenv.bcpus, &hmp_fast_cpu_mask);
+                sched_update_clbstats(&clbenv);
+
+#ifdef CONFIG_HMP_LAZY_BALANCE
+#ifdef CONFIG_HMP_POWER_AWARE_CONTROLLER
+                if (PA_ENABLE && LB_ENABLE) {
+#endif                          /* CONFIG_HMP_POWER_AWARE_CONTROLLER */
+                        if (is_light_task(p) && !is_buddy_busy(per_cpu(sd_pack_buddy, curr_cpu))) {
+#ifdef CONFIG_HMP_POWER_AWARE_CONTROLLER
+                                push_cpu = hmp_select_cpu(HMP_GB, p, &hmp_fast_cpu_mask, -1);
+                                if (hmp_cpu_is_fast(push_cpu)) {
+                                        AVOID_FORCE_UP_MIGRATION_FROM_CPUX_TO_CPUY_COUNT[curr_cpu][push_cpu]++;
+#ifdef CONFIG_HMP_TRACER
+                                        trace_sched_power_aware_active(POWER_AWARE_ACTIVE_MODULE_AVOID_FORCE_UP_FORM_CPUX_TO_CPUY, p->pid, curr_cpu, push_cpu);
+#endif                          /* CONFIG_HMP_TRACER */
+                                }
+#endif                          /* CONFIG_HMP_POWER_AWARE_CONTROLLER */
+                                goto out_force_up;
+                        }
+#ifdef CONFIG_HMP_POWER_AWARE_CONTROLLER
+                }
+#endif                          /* CONFIG_HMP_POWER_AWARE_CONTROLLER */
+#endif                          /* CONFIG_HMP_LAZY_BALANCE */
+
+                /* Check migration threshold */
+                if (!target->active_balance &&                                  /*      同一个时间单个 CPU 上只能完成一个任务迁移, 此时 CPU 调度队列的 active_balance 被设置   */
+                        hmp_up_migration(curr_cpu, &target_cpu, se, &clbenv) && /*      检查当前小核 CPU(curr_cpu) 上的进程实体 se 是否满足迁移到大核 CPU(target_cpu) 的条件   */
+                        !cpu_park(cpu_of(target))) {                            /*      当前 CPU 没有被 stop       */
+
+                        if (p->state != TASK_DEAD) {            /*      如果当前 CPU 仍然活跃   */
+                                target->active_balance = 1;
+                                target->push_cpu = target_cpu;
+                                target->migrate_task = p;
+                                force = 1;                      /*      force up 强制向上迁移   */
+                                trace_sched_hmp_migrate(p, target->push_cpu, 1);
+                                hmp_next_up_delay(&p->se, target->push_cpu);
+                        }
+                }
+
+#ifdef CONFIG_HMP_LAZY_BALANCE
+out_force_up:
+#endif                          /* CONFIG_HMP_LAZY_BALANCE */
+
+                raw_spin_unlock_irqrestore(&target->lock, flags);
+                if (force) {
+                        hmp_cpu_keepalive_trigger( );           /*      为大核设置保活监控定时器(add by gatieme(ChengJean))        */
+                        if (stop_one_cpu_dispatch(cpu_of(target),
+                                hmp_active_task_migration_cpu_stop,
+                                target, &target->active_balance_work)) {
+                                raw_spin_lock_irqsave(&target->lock, flags);
+                                target->active_balance = 0;
+                                force = 0;
+                                raw_spin_unlock_irqrestore(&target->lock, flags);
+                        }
+                }
+        }
+
+
+
+#ifdef CONFIG_HMP_TRACER
+        trace_sched_hmp_load(clbenv.bstats.load_avg, clbenv.lstats.load_avg);
+#endif  /*      #ifdef CONFIG_HMP_TRACER        */
+        spin_unlock(&hmp_force_migration);
+
+        return force;
 }
+#endif  /*      #ifdef CONFIG_HMP_DELAY_UP_MIGRATION    */
 
 
 #elif   defined(CONFIG_SCHED_HMP)   /*  && !defined(CONFIG_SCHED_HMP__ENHANCEMENT)      */
@@ -9684,12 +9819,15 @@ static void hmp_force_up_migration(int this_cpu)
 }
 
 
+
+//#ifdef CONFIG_HMP_DELAY_UP_MIGRATION
 /*
  * hmp_idle_pull looks at little domain runqueues to see
  * if a task should be pulled.
  *
  * Reuses hmp_force_migration spinlock.
  *
+ * modify by gatieme(ChengJean) for CONFIG_HMP_DELAY_UP_MIGRATION
  */
 static unsigned int hmp_idle_pull(int this_cpu)
 {
@@ -9788,6 +9926,8 @@ done:
         spin_unlock(&hmp_force_migration);
         return force;
 }
+//#endif  /*      #ifdef CONFIG_HMP_DELAY_UP_MIGRATION    */
+
 
 #else   /* CONFIG_SCHED_HMP_ENHANCEMENT */
 static void hmp_force_up_migration(int this_cpu) { }
