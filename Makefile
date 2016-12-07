@@ -2,7 +2,7 @@ all	: github
 .PHONY	: github
 
 
-GITHUB_COMMIT	:=	"完善 arm 的 hmpcb 负载均衡调度器..."
+GITHUB_COMMIT	:=	"备份 config 和 config.old..."
 
 github	:
 	git pull
