@@ -2,7 +2,7 @@ all	: github
 .PHONY	: github
 
 
-GITHUB_COMMIT	:=	"继续完善 arm64 的 hmpcb 负载均衡调度器, 完善 STOP_MACHINE 机制..."
+GITHUB_COMMIT	:=	"完善 arm 的 hmpcb 负载均衡调度器..."
 
 github	:
 	git pull

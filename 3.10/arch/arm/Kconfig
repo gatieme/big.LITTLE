@@ -1497,6 +1497,12 @@ config SCHED_SMT
 	  MultiThreading at a cost of slightly increased overhead in some
 	  places. If unsure say N here.
 
+
+#----------------------------------------------
+# linaro's configs for CONFIG_SCHED_HMP
+#----------------------------------------------
+
+
 config DISABLE_CPU_SCHED_DOMAIN_BALANCE
 	bool "(EXPERIMENTAL) Disable CPU level scheduler load-balancing"
 	help
@@ -1603,81 +1609,24 @@ config SCHED_HMP_LITTLE_PACKING
 
 
 # add by gatieme(ChengJean) for SCHED_HMP_ENHANCEMENT
-# begin 2016-12-01 16:19
-config SCHED_HMP_ENHANCEMENT
-	bool "(EXPERIMENTAL) HMP Ennhancement"
-	depends on SCHED_HMP
-	help
-	  HMP Ennhancement
+# begin 2016-12-01 16:25
 
+#----------------------------------------------
+# pack configs for CONFIG_SCHED_HMP
+#----------------------------------------------
 config HMP_TRACER
-	bool "(EXPERIMENTAL) Profile HMP scheduler"
-	depends on SCHED_HMP_ENHANCEMENT
-	help
+	bool "(EXPERIMENTAL-HMP) Profile HMP scheduler"
+	depends on SCHED_HMP
+        help
 	  Profile HMP scheduler
 
-config MET_SCHED_HMP
-	bool "(EXPERIMENTAL) MET SCHED HMP Info"
-	depends on SCHED_HMP_ENHANCEMENT
-	depends on HMP_TRACER
-	help
-	  MET SCHED HMP Info
-
-config HMP_DYNAMIC_THRESHOLD
-	bool "(EXPERIMENTAL) Dynamically adjust task migration threshold"
-	depends on SCHED_HMP_ENHANCEMENT
-	help
-	  Dynamically adjust task migration threshold according to current system load
-
-config HMP_GLOBAL_BALANCE
-	bool "(EXPERIMENTAL) Enhance HMP global load balance"
-	depends on SCHED_HMP_ENHANCEMENT
-	help
-	  Enhance HMP global load balance
-
-config HMP_TASK_ASSIGNMENT
-	bool "(EXPERIMENTAL) Enhance HMP task assignment"
-	depends on SCHED_HMP_ENHANCEMENT
-	help
-	  Enhance HMP task assignment
-
-config HMP_DISCARD_CFS_SELECTION_RESULT
-	bool "(EXPERIMENTAL) Discard CFS runqueue selection result"
-	depends on SCHED_HMP_ENHANCEMENT && HMP_TASK_ASSIGNMENT
-	help
-	  Discard CFS runqueue selection result even if only one cluster exists
-
-config HMP_PACK_SMALL_TASK
-	bool "(EXPERIMENTAL) Packing Small Tasks"
-	depends on SCHED_HMP_ENHANCEMENT
-	help
-		This option enables Packing Small Tasks
-
-config HMP_PACK_BUDDY_INFO
-	bool "(EXPERIMENTAL) Packing Small Tasks Buddy Information Log"
-	depends on SCHED_HMP_ENHANCEMENT && HMP_PACK_SMALL_TASK
-	help
-		This option enables Packing Small Tasks Buddy Information Log
-
-config HMP_LAZY_BALANCE
-	bool "(EXPERIMENTAL) Lazy Balance"
-	depends on SCHED_HMP_ENHANCEMENT && HMP_PACK_SMALL_TASK
-	help
-		This option enables Lazy Balance
-
-config HMP_POWER_AWARE_CONTROLLER
-	bool "(EXPERIMENTAL) Power-aware Scheduler for b.L MP Controller"
-	depends on SCHED_HMP_ENHANCEMENT && HMP_PACK_SMALL_TASK && HMP_LAZY_BALANCE
-	help
-		Power-aware scheduler for b.L MP controller and status interface
-
 config HEVTASK_INTERFACE
-	bool "task status interface"
+	bool "(EXPERIMENTAL-HMP)task status interface"
 	help
 	  The option provide an interface to show task status
 
 config ARCH_SCALE_INVARIANT_CPU_CAPACITY
-       bool "(EXPERIMENTAL) Scale-Invariant CPU Compute Capacity Recording"
+       bool "(EXPERIMENTAL-HMP) Scale-Invariant CPU Compute Capacity Recording"
        depends on CPU_FREQ
        help
          Provides a new measure of maximum and instantaneous CPU compute
@@ -1691,8 +1640,95 @@ config ARCH_SCALE_INVARIANT_CPU_CAPACITY
          performance from the table. Values range between 0 and 1023 where
          1023 is the highest capacity available in the system.
 
+config HMP_DELAY_UP_MIGRATION
+        bool "(EXPERIMENTAL-HMP) Delay migration task from LITTLE to BIG"
+        depends on SCHED_HMP
+        help
+          In this version we have stopped using forced up migrations when we
+          detect that a task running on a little CPU should be moved to a bigger
+          CPU. In most cases, the bigger CPU is in a deep sleep state and a forced
+          migration means we stop the task immediately but need to wait for the
+          target CPU to wake up before we can restart the task which is being
+          moved. Instead, we now wake a big CPU with an IPI and ask it to pull
+          a task when ready. This allows the task to continue executing on its
+          current CPU, reducing the amount of time that the task is stalled for.
+
+config HMP_PACK_STOP_MACHINE
+        bool "(EXPERIMENTAL-HMP) Packing HMP-stop machine"
+        depends on SCHED_HMP
+        help
+         This option enables Packing stop machine at the time of need
+         add    by gatieme(ChengJean) @ 2012-12-03 22:16 for support CONFIG_SCHED_HMP_ENHANCEMENT
+         modify by gatieme(ChengJean) @ 2012-12-07 18:10 for support CONFIG_SCHED_HMP
+
+#----------------------------------------------
+# pack configs for CONFIG_SCHED_HMP_ENHANCEMENT
+#----------------------------------------------
+
+config SCHED_HMP_ENHANCEMENT
+	bool "(EXPERIMENTAL-HMPCB) HMP Ennhancement"
+	depends on SCHED_HMP
+	help
+	  HMP Ennhancement
+
+config MET_SCHED_HMP
+	bool "(EXPERIMENTAL-HMPCB) MET SCHED HMP Info"
+	depends on SCHED_HMP_ENHANCEMENT && HMP_TRACER && SCHED_DEBUG
+	help
+	  MET SCHED HMP Info
+
+config HMP_DYNAMIC_THRESHOLD
+	bool "(EXPERIMENTAL-HMPCB) Dynamically adjust task migration threshold"
+	depends on SCHED_HMP_ENHANCEMENT
+	help
+	  Dynamically adjust task migration threshold according to current system load
+
+config HMP_GLOBAL_BALANCE
+	bool "(EXPERIMENTAL-HMPCB) Enhance HMP global load balance"
+	depends on SCHED_HMP_ENHANCEMENT
+	help
+	  Enhance HMP global load balance
+
+config HMP_TASK_ASSIGNMENT
+	bool "(EXPERIMENTAL-HMPCB) Enhance HMP task assignment"
+	depends on SCHED_HMP_ENHANCEMENT
+	help
+	  Enhance HMP task assignment
+
+config HMP_DISCARD_CFS_SELECTION_RESULT
+	bool "(EXPERIMENTAL-HMPCB) Discard CFS runqueue selection result"
+	depends on SCHED_HMP_ENHANCEMENT && HMP_TASK_ASSIGNMENT
+	help
+	  Discard CFS runqueue selection result even if only one cluster exists
+
+config HMP_PACK_SMALL_TASK
+	bool "(EXPERIMENTAL-HMPCB) Packing Small Tasks"
+	depends on SCHED_HMP_ENHANCEMENT && !SCHED_HMP_LITTLE_PACKING
+	help
+		This option enables Packing Small Tasks
+
+config HMP_PACK_BUDDY_INFO
+	bool "(EXPERIMENTAL-HMPCB) Packing Small Tasks Buddy Information Log"
+	depends on SCHED_HMP_ENHANCEMENT && HMP_PACK_SMALL_TASK
+	help
+		This option enables Packing Small Tasks Buddy Information Log
+
+
+config HMP_LAZY_BALANCE
+	bool "(EXPERIMENTAL-HMPCB) Lazy Balance"
+	depends on SCHED_HMP_ENHANCEMENT && HMP_PACK_SMALL_TASK
+	help
+		This option enables Lazy Balance
+
+config HMP_POWER_AWARE_CONTROLLER
+	bool "(EXPERIMENTAL-HMPCB) Power-aware Scheduler for b.L MP Controller"
+	depends on SCHED_HMP_ENHANCEMENT && HMP_PACK_SMALL_TASK && HMP_LAZY_BALANCE
+	help
+		Power-aware scheduler for b.L MP controller and status interface
+
+
 # add by gatieme(ChengJean) for SCHED_HMP_ENHANCEMENT
-# end 2016-12-01 16:19
+# end 2016-12-01 16:35
 
 config HAVE_ARM_SCU
 	bool
