@@ -5473,11 +5473,13 @@ select_task_rq_fair(struct task_struct *p, int sd_flag, int wake_flags)
         }
 #endif                          /* CONFIG_HMP_PACK_SMALL_TASK */
 
-#ifdef CONFIG_SCHED_HMP /*      此处有较多疑问, 待解决  */
+#ifdef CONFIG_SCHED_HMP         /*      此处有较多疑问, 待解决  */
         /* always put non-kernel forking tasks on a big domain */
         if (p->mm && unlikely(sd_flag & SD_BALANCE_FORK) && hmp_task_should_forkboost(p)) {  /*  对于新创建的进程并且该进程是用户进程    */
                 if (hmp_cpu_is_fastest(prev_cpu)) {
-                        struct hmp_domain *hmpdom = list_entry(&hmp_cpu_domain(prev_cpu)->hmp_domains, struct hmp_domain, hmp_domains);
+                        struct hmp_domain *hmpdom =
+                                list_entry(&hmp_cpu_domain(prev_cpu)->hmp_domains,
+                                                struct hmp_domain, hmp_domains);
                         __always_unused int lowest_ratio = hmp_domain_min_load(hmpdom, &new_cpu, NULL);
                         if (new_cpu < nr_cpu_ids && cpumask_test_cpu(new_cpu, tsk_cpus_allowed(p))) {
 #ifdef CONFIG_MTK_SCHED_TRACERS
@@ -5524,7 +5526,6 @@ select_task_rq_fair(struct task_struct *p, int sd_flag, int wake_flags)
                 new_cpu = prev_cpu;
         }
 #if 0
-
 #ifdef CONFIG_SCHED_HMP_ENHANCEMENT
         prefer_cpu = mt_select_task_rq_fair(p, prev_cpu);
                 if (prefer_cpu < nr_cpu_ids) {
@@ -7778,16 +7779,16 @@ must_do:
 static int __do_active_load_balance_cpu_stop(void *data, bool check_sd_lb_flag)
 {
         struct rq *busiest_rq = data;
+#ifdef CONFIG_SCHED_HMP
+        struct task_struct *p = busiest_rq->migrate_task;
+#endif
         int busiest_cpu = cpu_of(busiest_rq);
         int target_cpu = busiest_rq->push_cpu;
         struct rq *target_rq = cpu_rq(target_cpu);
         struct sched_domain *sd;
-        struct task_struct *p = NULL;
 
         raw_spin_lock_irq(&busiest_rq->lock);
-#ifdef CONFIG_SCHED_HMP
-        p = busiest_rq->migrate_task;
-#endif
+
         /* make sure the requested cpu hasn't gone down in the meantime */
         if (unlikely(busiest_cpu != smp_processor_id() ||
                      !busiest_rq->active_balance))
@@ -7866,6 +7867,7 @@ static int active_load_balance_cpu_stop(void *data)
 {
         return __do_active_load_balance_cpu_stop(data, true);
 }
+
 
 #ifdef CONFIG_NO_HZ_COMMON
 /*
@@ -8405,7 +8407,7 @@ static DEFINE_SPINLOCK(hmp_force_migration);
 
 
 /////////////////////
-// common functions for HMP and CONFIG_SCHED_HMP_ENHANCEMENT
+// common functions for HMP and HMP_ENHANCEMENT
 /////////////////////
 
 
@@ -8421,7 +8423,87 @@ static int hmp_active_task_migration_cpu_stop(void *data)
 {
         return __do_active_load_balance_cpu_stop(data, false);
 }
+////////////////////
+// 两个函数其实没有任何差别
+//
+// static int hmp_active_task_migration_cpu_stop(void *data)
+// static int hmp_idle_pull_cpu_stop(void *data)
+////////////////////
+#ifdef CONFIG_HMP_DELAY_UP_MIGRATION
+/*
+ * hmp_idle_pull_cpu_stop is run by cpu stopper and used to
+ * migrate a specific task from one runqueue to another.
+ * hmp_idle_pull uses this to push a currently running task
+ * off a runqueue to a faster CPU.
+ * Locking is slightly different than usual.
+ * Based on active_load_balance_stop_cpu and can potentially be merged.
+ */
+static int hmp_idle_pull_cpu_stop(void *data)
+{
+	struct rq *busiest_rq = data;
+	struct task_struct *p = busiest_rq->migrate_task;
+	int busiest_cpu = cpu_of(busiest_rq);
+	int target_cpu = busiest_rq->push_cpu;
+	struct rq *target_rq = cpu_rq(target_cpu);
+	struct sched_domain *sd;
 
+	raw_spin_lock_irq(&busiest_rq->lock);
+
+	/* make sure the requested cpu hasn't gone down in the meantime */
+	if (unlikely(busiest_cpu != smp_processor_id() ||
+		!busiest_rq->active_balance))
+		goto out_unlock;
+
+	/* Is there any task to move? */
+	if (busiest_rq->nr_running <= 1)
+		goto out_unlock;
+
+	/* Task has migrated meanwhile, abort forced migration */
+	if (task_rq(p) != busiest_rq)
+		goto out_unlock;
+
+	/*
+	 * This condition is "impossible", if it occurs
+	 * we need to fix it. Originally reported by
+	 * Bjorn Helgaas on a 128-cpu setup.
+	 */
+	BUG_ON(busiest_rq == target_rq);
+
+	/* move a task from busiest_rq to target_rq */
+	double_lock_balance(busiest_rq, target_rq);
+
+	/* Search for an sd spanning us and the target CPU. */
+	rcu_read_lock();
+	for_each_domain(target_cpu, sd) {
+		if (cpumask_test_cpu(busiest_cpu, sched_domain_span(sd)))
+			break;
+	}
+	if (likely(sd)) {
+		struct lb_env env = {
+			.sd		= sd,
+			.dst_cpu	= target_cpu,
+			.dst_rq		= target_rq,
+			.src_cpu	= busiest_rq->cpu,
+			.src_rq		= busiest_rq,
+			.idle		= CPU_IDLE,
+		};
+
+		schedstat_inc(sd, alb_count);
+
+		if (move_specific_task(&env, p))
+			schedstat_inc(sd, alb_pushed);
+		else
+			schedstat_inc(sd, alb_failed);
+	}
+	rcu_read_unlock();
+	double_unlock_balance(busiest_rq, target_rq);
+out_unlock:
+	put_task_struct(p);
+	busiest_rq->active_balance = 0;
+	raw_spin_unlock_irq(&busiest_rq->lock);
+	return 0;
+}
+#endif	/* CONFIG_HMP_DELAY_UP_MIGRATION */
 
 /*
  * hmp_can_migrate_task - may task p from runqueue rq be migrated to this_cpu?
@@ -8509,6 +8591,8 @@ static int move_specific_task(struct lb_env *env, struct task_struct *pm)
 
 
 
+
+
 #ifdef CONFIG_SCHED_HMP_ENHANCEMENT     /*      &&      defined(CONFIG_SCHED_HMP)       */
 
 /*
@@ -8546,7 +8630,15 @@ static unsigned int hmp_down_migration(int cpu, int *target_cpu, struct sched_en
 /*
  * These functions add next up/down migration delay that prevents the task from
  * doing another migration in the same direction until the delay has expired.
+ *
+ * 为了避免频繁对某个 CPU 上的任务进行迁移, 我们设置了两个迁移阀值
+ *
+ * hmp_next_up_threshold        两次向上迁移的时间间隔阀值
+ *
+ * hmp_next_down_threshold      两次向下迁移的时间间隔阀值
  */
+
+/* 检查当前 cpu 上距离上次向上迁移的时间间隔是否超过了阀值 hmp_next_up_threshold */
 static int hmp_up_stable(int cpu)
 {
         struct cfs_rq *cfs_rq = &cpu_rq(cpu)->cfs;
@@ -8556,6 +8648,7 @@ static int hmp_up_stable(int cpu)
         return 1;
 }
 
+/* 检查当前 cpu 上距离上次向下迁移的时间间隔是否超过了阀值 hmp_next_down_threshold */
 static int hmp_down_stable(int cpu)
 {
         struct cfs_rq *cfs_rq = &cpu_rq(cpu)->cfs;
@@ -8565,12 +8658,27 @@ static int hmp_down_stable(int cpu)
         return 1;
 }
 
-/* Select the most appropriate CPU from hmp cluster
+/*
+ * Select the most appropriate CPU from hmp cluster
  * 为进程 p 找到一个最适合的 cpu 供其运行
+ *
+ * 参数描述     :
+ *      caller  [ HMP_GB | HMP_SELECT_RQ | HMP_LB ]
+ *      p       待处理的进程信息
+ *      mask    可运行的 CPU 的 mask 掩码信息
+ *      prev    进程 p 当前运行在的 CPU
+ *
+ * 实现描述     :
+ *      遍历 cpu-mask 中所有在线 CPU,
+ *      依次计算任务 p 在每个 CPU 运行的 WORK LOAD,
+ *      找出 WORK LOAD 最小的那个 CPU 作为最优的目标 CPU(target),
+ *      如果多个 CPU 上 WORK LOAD 均最优, 且其中包含 p 当前所在的 CPU(prev)
+ *      则优先选择 prev, 避免进行无用的迁移
+ *
  * 调用关系
- * run_rebalance_domains( )
- *      ->      hmp_force_up_migration( )
- *              ->      hmp_select_cpu( )
+ *      run_rebalance_domains( )
+ *              ->      hmp_force_up_migration( )
+ *                      ->      hmp_select_cpu( )
  * */
 static unsigned int hmp_select_cpu(unsigned int caller, struct task_struct *p,
                         struct cpumask *mask, int prev)
@@ -8580,7 +8688,10 @@ static unsigned int hmp_select_cpu(unsigned int caller, struct task_struct *p,
         unsigned long curr_wload = 0;
         unsigned long target_wload = 0;
         struct cpumask srcp;
+
+        /* 跳过 mask 中不在线的 CPU */
         cpumask_and(&srcp, cpu_online_mask, mask);
+        /* Note that cpumask_any_and() returns the first cpu in the cpumask */
         target = cpumask_any_and(&srcp, tsk_cpus_allowed(p));
         if (NR_CPUS == target)
                 goto out;
@@ -8588,7 +8699,13 @@ static unsigned int hmp_select_cpu(unsigned int caller, struct task_struct *p,
         /*
          * RT class is taken into account because CPU load is multiplied
          * by the total number of CPU runnable tasks that includes RT tasks.
+         *
+         * wload        =       (cpu_rq(cpu)->cfs.avg.load_avg_ratio + 1)
+         *              +       (cpu_rq(cpu)->cfs.avg.pending_load)
+         *              +       (cpu_rq(cpu)->nr_running + cfs_nr_pending(cpu))
          */
+        /* get the workload @ target_cpu,
+         * 获取任务 p 在 target CPU 上运行的 WORD LOAD 信息 */
         target_wload = hmp_inc(cfs_load(target));
         target_wload += cfs_pending_load(target);
         target_wload *= rq_length(target);
@@ -8597,17 +8714,27 @@ static unsigned int hmp_select_cpu(unsigned int caller, struct task_struct *p,
                 if (!cpu_online(curr) || !cpumask_test_cpu(curr, tsk_cpus_allowed(p)))
                         continue;
 
-                /* For global load balancing, unstable CPU will be bypassed */
+                /* For global load balancing, unstable CPU will be bypassed
+                 * 全局均衡调度器会避免在短时间内在某个 CPU 上多次进行任务迁移 */
                 if (hmp_caller_is_gb(caller) && !hmp_cpu_stable(curr))
                         continue;
 
+                /* get the workload @ target_cpu,
+                 * 获取任务 p 在 current CPU 上运行的 WORD LOAD 信息 */
                 curr_wload = hmp_inc(cfs_load(curr));
                 curr_wload += cfs_pending_load(curr);
                 curr_wload *= rq_length(curr);
+
                 if (curr_wload < target_wload) {
+                        /* 如果任务 p 在当前循环遍历到的 CPU(current) 上运行的 WORK LOAD 最小
+                         * 就选择 current CPU 作为最优的 CPU */
                         target_wload = curr_wload;
                         target = curr;
                 } else if (curr_wload == target_wload && curr == prev) {
+                        /* 如果任务 p 在多个 CPU 上运行的 WORK LOAD 都比较优
+                         * 而且这些 CPU 中有任务 p 当前所在的 CPU(prev),
+                         * 则优先选择先前所在的 CPU(prev), 这样可以避免迁移
+                         * */
                         target = curr;
                 }
         }
@@ -9081,6 +9208,7 @@ static void hmp_force_down_migration(int this_cpu)
                 }
 
                 p = task_of(se);
+                /* 从小核调度域中中选取一个合适的 CPU 供进程 p 运行 */
                 target_cpu = hmp_select_cpu(HMP_GB, p, &hmp_slow_cpu_mask, -1);
                 if (NR_CPUS == target_cpu) {
                         raw_spin_unlock_irqrestore(&target->lock, flags);
@@ -9127,7 +9255,7 @@ static void hmp_force_down_migration(int this_cpu)
                         stop_one_cpu_nowait(cpu_of(target),
                                 hmp_active_task_migration_cpu_stop,
                                 target, &target->active_balance_work);  /*  暂停迁移源 CPU 后, 强行进行迁移 */
-#endif  /*      #ifdef CONFIG_HMP_PACK_STOP_MACHINE     */
+#endif  /* #ifdef CONFIG_HMP_PACK_STOP_MACHINE */
                 }
         }
 }
@@ -9216,7 +9344,7 @@ static void hmp_force_up_migration(int this_cpu)
 #ifdef CONFIG_HMP_LAZY_BALANCE
 #ifdef CONFIG_HMP_POWER_AWARE_CONTROLLER
                 if (PA_ENABLE && LB_ENABLE) {
-#endif                          /* CONFIG_HMP_POWER_AWARE_CONTROLLER */
+#endif  /* CONFIG_HMP_POWER_AWARE_CONTROLLER */
                         if (is_light_task(p) && !is_buddy_busy(per_cpu(sd_pack_buddy, curr_cpu))) {
 #ifdef CONFIG_HMP_POWER_AWARE_CONTROLLER
                                 push_cpu = hmp_select_cpu(HMP_GB, p, &hmp_fast_cpu_mask, -1);
@@ -9224,22 +9352,22 @@ static void hmp_force_up_migration(int this_cpu)
                                         AVOID_FORCE_UP_MIGRATION_FROM_CPUX_TO_CPUY_COUNT[curr_cpu][push_cpu]++;
 #ifdef CONFIG_HMP_TRACER
                                         trace_sched_power_aware_active(POWER_AWARE_ACTIVE_MODULE_AVOID_FORCE_UP_FORM_CPUX_TO_CPUY, p->pid, curr_cpu, push_cpu);
-#endif                          /* CONFIG_HMP_TRACER */
+#endif  /* CONFIG_HMP_TRACER */
                                 }
-#endif                          /* CONFIG_HMP_POWER_AWARE_CONTROLLER */
+#endif  /* CONFIG_HMP_POWER_AWARE_CONTROLLER */
                                 goto out_force_up;
                         }
 #ifdef CONFIG_HMP_POWER_AWARE_CONTROLLER
                 }
-#endif                          /* CONFIG_HMP_POWER_AWARE_CONTROLLER */
-#endif                          /* CONFIG_HMP_LAZY_BALANCE */
+#endif  /* CONFIG_HMP_POWER_AWARE_CONTROLLER */
+#endif  /* CONFIG_HMP_LAZY_BALANCE */
 
                 /* Check migration threshold */
                 if (!target->active_balance     /*      同一个时间单个 CPU 上只能完成一个任务迁移, 此时 CPU 调度队列的 active_balance 被设置   */
                         && hmp_up_migration(curr_cpu, &target_cpu, se, &clbenv) /*      检查当前小核 CPU(curr_cpu) 上的进程实体 se 是否满足迁移到大核 CPU(target_cpu) 的条件   */
 #ifdef CONFIG_HMP_PACK_STOP_MACHINE     /*      && defined(CONFIG_SCHED_HMP_ENHANCEMENT)        */
                         && !cpu_park(cpu_of(target))            /*      当前 CPU 没有被 stop       */
-#endif  /*      #ifdef CONFIG_HMP_PACK_STOP_MACHINE && defined(CONFIG_SCHED_HMP_ENHANCEMENT)        */
+#endif  /* #ifdef CONFIG_HMP_PACK_STOP_MACHINE && defined(CONFIG_SCHED_HMP_ENHANCEMENT)        */
                                                 ) {
 #ifdef CONFIG_HMP_DELAY_UP_MIGRATION
 ////////////////////////////////////////////////////////////////////////////////
@@ -9250,7 +9378,8 @@ static void hmp_force_up_migration(int this_cpu)
                         raw_spin_unlock_irqrestore(&target->lock, flags);
                         spin_unlock(&hmp_force_migration);
                         smp_send_reschedule(target_cpu);                    /*  发送一个IPI_RESCHEDULE 的 IPI 中断给 target_cpu */
-                }
+
+                        //return ;
 #else                   /*      如果未开启延迟向上迁移的过程, 则直接进行向上迁移                                        */
                         if (p->state != TASK_DEAD) {            /*      如果当前 CPU 仍然活跃   */
                                 target->active_balance = 1;
@@ -9260,9 +9389,9 @@ static void hmp_force_up_migration(int this_cpu)
                                 trace_sched_hmp_migrate(p, target->push_cpu, 1);
                                 hmp_next_up_delay(&p->se, target->push_cpu);
                         }
-                }
 
 #endif  /*      #if CONFIG_HMP_DELAY_UP_MIGRATION       */
+                }
 
 #ifdef CONFIG_HMP_LAZY_BALANCE
 out_force_up:
@@ -9387,7 +9516,7 @@ static unsigned int hmp_idle_pull(int this_cpu)
 #ifdef CONFIG_HMP_LAZY_BALANCE
 #ifdef CONFIG_HMP_POWER_AWARE_CONTROLLER
                 if (PA_ENABLE && LB_ENABLE) {
-#endif                          /* CONFIG_HMP_POWER_AWARE_CONTROLLER */
+#endif  /* CONFIG_HMP_POWER_AWARE_CONTROLLER */
                         if (is_light_task(p) && !is_buddy_busy(per_cpu(sd_pack_buddy, curr_cpu))) {
 #ifdef CONFIG_HMP_POWER_AWARE_CONTROLLER
                                 push_cpu = hmp_select_cpu(HMP_GB, p, &hmp_fast_cpu_mask, -1);
@@ -9395,15 +9524,15 @@ static unsigned int hmp_idle_pull(int this_cpu)
                                         AVOID_FORCE_UP_MIGRATION_FROM_CPUX_TO_CPUY_COUNT[curr_cpu][push_cpu]++;
 #ifdef CONFIG_HMP_TRACER
                                         trace_sched_power_aware_active(POWER_AWARE_ACTIVE_MODULE_AVOID_FORCE_UP_FORM_CPUX_TO_CPUY, p->pid, curr_cpu, push_cpu);
-#endif                          /* CONFIG_HMP_TRACER */
+#endif  /* CONFIG_HMP_TRACER */
                                 }
-#endif                          /* CONFIG_HMP_POWER_AWARE_CONTROLLER */
+#endif  /* CONFIG_HMP_POWER_AWARE_CONTROLLER */
                                 goto out_force_up;
                         }
 #ifdef CONFIG_HMP_POWER_AWARE_CONTROLLER
                 }
-#endif                          /* CONFIG_HMP_POWER_AWARE_CONTROLLER */
-#endif                          /* CONFIG_HMP_LAZY_BALANCE */
+#endif  /* CONFIG_HMP_POWER_AWARE_CONTROLLER */
+#endif  /* CONFIG_HMP_LAZY_BALANCE */
 
                 /* Check migration threshold */
                 if (!target->active_balance                             /*      同一个时间单个 CPU 上只能完成一个任务迁移, 此时 CPU 调度队列的 active_balance 被设置   */

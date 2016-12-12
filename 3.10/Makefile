@@ -195,7 +195,7 @@ SUBARCH := $(shell uname -m | sed -e s/i.86/x86/ -e s/x86_64/x86/ \
 #ARCH		?= arm64
 #CROSS_COMPILE	?= aarch64-linux-gnu-
 ARCH		?= arm
-CROSS_COMPILE	?= /home/gatieme/Work/Arm/Board/cubie-a80/cc-a80-linux-sdk/tools/crosscompiler/bin/arm-linux-gnueabi-
+CROSS_COMPILE	?= /home/gatieme/Work/Arm/Board/cubieboard/cc-a80/cc-a80-linux-sdk/tools/crosscompiler/bin/arm-linux-gnueabi-
 #ARCH		?= $(SUBARCH)
 #CROSS_COMPILE	?= $(CONFIG_CROSS_COMPILE:"%"=%)
 

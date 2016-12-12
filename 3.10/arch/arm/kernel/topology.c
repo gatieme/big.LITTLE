@@ -170,10 +170,10 @@ struct cpu_capacity {
 struct cpu_capacity *cpu_capacity;
 
 unsigned long middle_capacity = 1;
-#ifdef CONFIG_SCHED_HMP_ENHANCEMENT
+//#ifdef CONFIG_SCHED_HMP_ENHANCEMENT
 unsigned long min_capacity = (unsigned long)(-1);
 unsigned long max_capacity = 0;
-#endif	/*	CONFIG_SCHED_HMP_ENHANCEMENT	*/
+//#endif	/*	CONFIG_SCHED_HMP_ENHANCEMENT	*/
 
 
 /*
@@ -188,8 +188,8 @@ static void __init parse_dt_topology(void)
 {
 	struct cpu_efficiency *cpu_eff;
 	struct device_node *cn = NULL;
-	unsigned long min_capacity = (unsigned long)(-1);
-	unsigned long max_capacity = 0;
+	//unsigned long min_capacity = (unsigned long)(-1);
+	//unsigned long max_capacity = 0;
 	unsigned long capacity = 0;
 	int alloc_size, cpu = 0;
 
