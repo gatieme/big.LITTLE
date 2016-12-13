@@ -38,24 +38,57 @@
 
 
 /*
+
+
+////////////////////////////////////////////////////////////
+///     depond configs
+////////////////////////////////////////////////////////////
 #define CONFIG_SMP
 #define CONFIG_SCHED_HMP
 #define CONFIG_NO_HZ_COMMON
-#define CONFIG_HMP_VARIABLE_SCALE
 #define CONFIG_CPU_IDLE
-#define CONFIG_HMP_TRACER
 #define CONFIG_FAIR_GROUP_SCHED
-
-
-#define CONFIG_SCHED_HMP_ENHANCEMENT
-#define CONFIG_HMP_PACK_SMALL_TASK
 #define USE_HMP_DYNAMIC_THRESHOLD
-#define CONFIG_HMP_PACK_BUDDY_INFO
-#define CONFIG_HMP_FREQUENCY_INVARIANT_SCALE
 #define CONFIG_SCHEDSTATS
-#define CONFIG_HMP_POWER_AWARE_CONTROLLER
-#define CONFIG_HMP_PACK_SMALL_TASK
 
+////////////////////////////////////////////////////////////
+///     HMP  configs
+////////////////////////////////////////////////////////////
+#define CONFIG_SCHED_HMP
+#define CONFIG_SCHED_HMP_PRIO_FILTER
+#define CONFIG_SCHED_HMP_PRIO_FILTER_VAL
+#define CONFIG_HMP_FAST_CPU_MASK
+#define CONFIG_HMP_SLOW_CPU_MASK
+#define CONFIG_HMP_VARIABLE_SCALE
+#define CONFIG_HMP_FREQUENCY_INVARIANT_SCALE
+#define CONFIG_SCHED_HMP_LITTLE_PACKING
+
+
+
+////////////////////////////////////////////////////////////
+///     HMP  configs add by gatieme(ChengJean)
+////////////////////////////////////////////////////////////
+#define CONFIG_ARCH_SCALE_INVARIANT_CPU_CAPACITY
+#define CONFIG_HMP_TRACER
+#define CONFIG_HEVTASK_INTERFACE
+#define CONFIG_HMP_DELAY_UP_MIGRATION
+#define CONFIG_HMP_PACK_STOP_MACHINE
+
+
+////////////////////////////////////////////////////////////
+///     HMP ENHANCEMENT configs add by gatieme(ChengJean)
+////////////////////////////////////////////////////////////
+#define CONFIG_SCHED_HMP_ENHANCEMENT            //      优化的 hmpcb 负载均衡调度器
+#define CONFIG_HMP_DYNAMIC_THRESHOLD            //      动态阀值
+#define USE_HMP_DYNAMIC_THRESHOLD
+#define CONFIG_HMP_GLOBAL_BALANCE               //      全局负载均衡调度器
+#define CONFIG_HMP_TASK_ASSIGNMENT              //
+#define CONFIG_HMP_DISCARD_CFS_SELECTION_RESULT //
+#define CONFIG_HMP_PACK_SMALL_TASK              //
+#define CONFIG_HMP_PACK_BUDDY_INFO              //
+#define CONFIG_HMP_LAZY_BALANCE                 //
+#define CONFIG_HMP_POWER_AWARE_CONTROLLER       //
+#define CONFIG_HMP_PACK_LB_ENV                  //
 */
 
 
@@ -2136,7 +2169,10 @@ static inline void __update_task_entity_contrib(struct sched_entity *se)
         contrib /= (se->avg.runnable_avg_period + 1);
         se->avg.load_avg_contrib = scale_load(contrib);
         trace_sched_task_load_contrib(task_of(se), se->avg.load_avg_contrib);
-/*      modify by gatieme(CehgnJean)
+/*
+        //      modify by gatieme(CehgnJean)
+        //      see     function
+        //      static long __update_task_entity_ratio(struct sched_entity *se)
         contrib = se->avg.runnable_avg_sum * scale_load_down(NICE_0_LOAD);
         contrib /= (se->avg.runnable_avg_period + 1);
         se->avg.load_avg_ratio = scale_load(contrib);
@@ -2163,7 +2199,22 @@ static long __update_entity_load_avg_contrib(struct sched_entity *se, long *rati
 }
 
 #if defined(CONFIG_MTK_SCHED_CMP) || defined(CONFIG_SCHED_HMP_ENHANCEMENT)
-/* usage_avg_sum & load_avg_ratio are based on Linaro 12.11. */
+/*
+ * usage_avg_sum & load_avg_ratio are based on Linaro 12.11.
+ *
+ * HMP 调度器使用了内核中 Per-entity 的负载计算方法,
+ * 在 sched_avg 中定义了额外的两个负载变量
+ * load_avg_ratio 和usage_avg_sum
+ *
+ * load_avg_ratio 的计算和内核中 load_avg_contrib 计算方法类似
+ * 但是它没有乘以调度实体的实际权值, 而是用 nice 为 0 的权值
+ * 因此它是进程可运行时间的一个比率
+ * se.avg.load_avg_ratio =
+ *              (se.avg.runnable_sum * NICE_0_LOAD)
+ *      /       (se.avg.runnable_avg_period + 1)
+ *
+ * usgae_avg_sum 是表示进程处于运行状态的负载
+ * */
 static long __update_task_entity_ratio(struct sched_entity *se)
 {
         long old_ratio = se->avg.load_avg_ratio;
@@ -4189,17 +4240,17 @@ done:
 
 
 struct clb_env {
-        struct clb_stats bstats;
-        struct clb_stats lstats;
+        struct clb_stats bstats;        /* big cluster 的统计信息          */
+        struct clb_stats lstats;        /* little cluster 的统计信息       */
         int btarget, ltarget;
 
-        struct cpumask bcpus;
-        struct cpumask lcpus;
+        struct cpumask bcpus;           /* big cluster 的 CPU MASK 信息    */
+        struct cpumask lcpus;           /* little cluster 的 CPU MASK 信息 */
 
         unsigned int flags;
         struct mcheck {
-                int status; /* Details of this migration check */
-                int result; /* Indicate whether we should perform this task migration */
+                int status;             /* Details of this migration check */
+                int result;             /* Indicate whether we should perform this task migration */
         } mcheck;
 };
 
@@ -8914,6 +8965,25 @@ out:
 struct hmp_statisic hmp_stats;
 #endif
 
+/*
+ * Task Dynamic Migration Threshold Adjustment.
+ *
+ * If the workload between clusters is not balanced, adjust migration
+ * threshold in an attempt to move task precisely.
+ *
+ * Diff. = Max Threshold - Min Threshold
+ *
+ * Dynamic UP-Threshold =
+ *                               B_nacap               B_natask
+ * Max Threshold - Diff. x  -----------------  x  -------------------
+ *                          B_nacap + L_nacap     B_natask + L_natask
+ *
+ *
+ * Dynamic Down-Threshold =
+ *                               L_nacap               L_natask
+ * Min Threshold + Diff. x  -----------------  x  -------------------
+ *                          B_nacap + L_nacap     B_natask + L_natask
+ */
 static inline void hmp_dynamic_threshold(struct clb_env *clbenv)
 {
         struct clb_stats *L = &clbenv->lstats;
@@ -8936,16 +9006,17 @@ static inline void hmp_dynamic_threshold(struct clb_env *clbenv)
         B->threshold /= hmp_inc(B_normalized_acap + L_normalized_acap);
         B->threshold /= hmp_inc(B_normalized_atask + L_normalized_atask);
         B->threshold = hmp_up_threshold - B->threshold;
-#else                           /* !CONFIG_HMP_DYNAMIC_THRESHOLD */
+#else   /* !CONFIG_HMP_DYNAMIC_THRESHOLD */
         clbenv->lstats.threshold = hmp_down_threshold;  /* down threshold */
-        clbenv->bstats.threshold = hmp_up_threshold;    /* up threshold */
-#endif                          /* CONFIG_HMP_DYNAMIC_THRESHOLD */
+        clbenv->bstats.threshold = hmp_up_threshold;    /* up threshold   */
+#endif  /* CONFIG_HMP_DYNAMIC_THRESHOLD */
 
         mt_sched_printf(sched_log, "[%s]\tup/dl:%4d/%4d bcpu(%d):%d/%d, lcpu(%d):%d/%d\n", __func__,
                         B->threshold, L->threshold,
                         clbenv->btarget, clbenv->bstats.cpu_capacity, clbenv->bstats.cpu_power,
                         clbenv->ltarget, clbenv->lstats.cpu_capacity, clbenv->lstats.cpu_power);
 }
+
 
 /*
  * Check whether this task should be migrated to big
