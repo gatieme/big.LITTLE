@@ -995,9 +995,9 @@ struct sched_avg {
 	u64 last_runnable_update;
 	s64 decay_count;
 	unsigned long load_avg_contrib;
-	unsigned long load_avg_ratio;       /*  进程可运行时间的一个比率                */
+/* DEGIN add by gatieme(ChengJean) for HMP */
+        unsigned long load_avg_ratio;       /*  进程可运行时间的一个比率                */
 #ifdef CONFIG_SCHED_HMP
-
 #ifdef CONFIG_SCHED_HMP_ENHANCEMENT
         unsigned long pending_load;
         u32 nr_pending;
@@ -1010,6 +1010,7 @@ struct sched_avg {
 	u64 hmp_last_down_migration;        /*  记录当前进程调度实体上次向下迁移的时间  */
 #endif /* CONFIG_SCHED_HMP */
 	u32 usage_avg_sum;                  /*  进程处于运行状态的负载                  */
+/* -END- add by gatieme(ChengJean) for HMP */
 };
 
 #ifdef CONFIG_SCHED_HMP
