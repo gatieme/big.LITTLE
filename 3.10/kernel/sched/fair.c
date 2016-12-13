@@ -48,7 +48,6 @@
 #define CONFIG_NO_HZ_COMMON
 #define CONFIG_CPU_IDLE
 #define CONFIG_FAIR_GROUP_SCHED
-#define USE_HMP_DYNAMIC_THRESHOLD
 #define CONFIG_SCHEDSTATS
 
 ////////////////////////////////////////////////////////////
@@ -68,11 +67,11 @@
 ////////////////////////////////////////////////////////////
 ///     HMP  configs add by gatieme(ChengJean)
 ////////////////////////////////////////////////////////////
-#define CONFIG_ARCH_SCALE_INVARIANT_CPU_CAPACITY
-#define CONFIG_HMP_TRACER
-#define CONFIG_HEVTASK_INTERFACE
-#define CONFIG_HMP_DELAY_UP_MIGRATION
-#define CONFIG_HMP_PACK_STOP_MACHINE
+#define CONFIG_ARCH_SCALE_INVARIANT_CPU_CAPACITY//      CPU 直接调节频率
+#define CONFIG_HMP_TRACER                       //      trace 信息
+#define CONFIG_HEVTASK_INTERFACE                //      /proc/task_detect 的文件接口信息
+#define CONFIG_HMP_DELAY_UP_MIGRATION           //      延迟进行向上迁移
+#define CONFIG_HMP_PACK_STOP_MACHINE            //      stop machine 的 hmp 补丁
 
 
 ////////////////////////////////////////////////////////////
@@ -89,6 +88,78 @@
 #define CONFIG_HMP_LAZY_BALANCE                 //
 #define CONFIG_HMP_POWER_AWARE_CONTROLLER       //
 #define CONFIG_HMP_PACK_LB_ENV                  //
+
+
+
+
+
+
+
+
+函数描述
+
+| 函数 | 功能 |
+|:----:|:----:|
+| hmp_select_cpu(caller, p, mask, prev) | 为进程 p 从 mask 指示的调度域中选择一个合适的 CPU 供其运行                    |
+| hmp_select_task_rq_fair(sd_flag, p, prev_cpu. new_cpu) | 为进程 p 从大小核心中找到一个合适的 CPU 供其运行             |
+|--------|--------|
+| hmp_up_migration(cpu, target_cpu, se, clbenv)   | 检查进程 se 是否满足从小核 cpu 向上迁移至 大核 target_cpu 的条件    |                                   |
+| hmp_down_migration(cpu, target_cpu, se, clbenv) | 检查进程 se 是否满足从大核 cpu 向下迁移至 小核 target_cpu 的条件    |
+| hmp_dynamic_threshold(clbenv)                   | 动态计算向上迁移的阀值 hmp_up_threshold 和向下迁移的阀值 hmp_down_threshold |
+|--------|--------|
+| hmp_up_stable(cpu)   | 检查 cpu 上近期是否进行过向上迁移, 上次迁移时间超过向上迁移的时间阀值 |
+| hmp_down_stable(cpu) | 检查 cpu 上近期是否进行过向下迁移, 上次迁移时间超过向下迁移的时间阀值 |
+
+
+
+阀值描述
+
+#ifdef CONFIG_SCHED_HMP_PRIO_FILTER
+==优先级阀值==
+hmp_up_prio
+        Only up migrate task with high priority (<hmp_up_prio)
+        大核本身是为了执行那些负载较高的进程,
+        但是从现实考虑, 并不是所有的进程都需要向上迁移
+        那些任务繁重, 但是优先级极低的进程, 我们无需向上迁移,
+        让一个无关紧要但是却很繁重的进程占用大核, 拉高系统的能耗
+        因此设置优先级阀值 hmp_up_prio
+        优先级值高于hmp_up_prio(即优先级较低)的进程无需从小核迁移到大核
+#endif                  该阀值由 CONFIG_SCHED_HMP_PRIO_FILTER 宏开启
+
+
+
+==负载阀值==
+hmp_up_threshold
+        min. load required for migrating tasks to a faster cpu
+        只有负载高于 hmp_up_threshold 的进程才需要进行向上迁移
+hmp_down_threshold
+        max. load allowed for tasks migrating to a slower cpu
+        只有负载低于 hmp_down_threshold 的进程才需要进行向下迁移
+
+
+==迁移间隔阀值==
+该阀值避免进程被迁移来迁移去
+hmp_next_up_threshold,
+        Delay before next up migration (1024 ~= 1 ms)
+        只有上次向上迁移距离当前时间的间隔大于 hmp_next_up_threshold 的进程才可以进行迁移
+
+hmp_next_down_threshold
+        Delay before next down migration (1024 ~= 1 ms)
+        只有上次向下迁移距离当前时间的间隔大于 hmp_next_up_threshold 的进程才可以进行迁移
+
+#ifdef CONFIG_SCHED_HMP_LITTLE_PACKING
+Small Task Packing:
+We can choose to fill the littlest CPUs in an HMP system rather than
+the typical spreading mechanic. This behavior is controllable using
+two variables.
+
+hmp_packing_enabled
+        runtime control over pack/spread
+
+hmp_full_threshold
+        Consider a CPU with this much unweighted load full
+#endif
+
 */
 
 
@@ -8823,8 +8894,10 @@ static int hmp_select_task_rq_fair(int sd_flag, struct task_struct *p,
          * Skip all the checks if only one CPU is online.
          * Otherwise, select the most appropriate CPU from cluster.
          */
+        /* 如果当前只有一个在线的 CPU, 则无需进行多余的检查, 只能使用prev CPU */
         if (num_online_cpus() == 1)
                 goto out;
+        /* 从两个调度域中分别选择一个合适的 CPU 以供进行 p 运行 */
         B_target = hmp_select_cpu(HMP_SELECT_RQ, p, &hmp_fast_cpu_mask, prev_cpu);
         L_target = hmp_select_cpu(HMP_SELECT_RQ, p, &hmp_slow_cpu_mask, prev_cpu);
 
@@ -8835,28 +8908,36 @@ static int hmp_select_task_rq_fair(int sd_flag, struct task_struct *p,
          */
 #ifdef CONFIG_HMP_DISCARD_CFS_SELECTION_RESULT
         if (NR_CPUS == B_target && NR_CPUS == L_target)
-                goto out;
+                goto out;               /* 没有合适的 CPU 则转到 out, 仍然选择之前的 CPU(prev) */
         if (NR_CPUS == B_target)
-                goto select_slow;
+                goto select_slow;       /* 如果没有合适的大核 CPU, 则从小核中选取 */
         if (NR_CPUS == L_target)
-                goto select_fast;
+                goto select_fast;       /* 如果没有合适的小核 CPU, 则从大核中选取 */
 #else
         if (NR_CPUS == B_target || NR_CPUS == L_target)
                 goto out;
 #endif
 
         /*
+         * 如果两个调度域中均找到了合适的 CPU 以供进程 p 执行
+         *
          * Two clusters exist and both clusters are allowed for this task
          * Step 1: Move newly created task to the cpu where no tasks are running
          * Step 2: Migrate heavy-load task to big
          * Step 3: Migrate light-load task to LITTLE
          * Step 4: Make sure the task stays in its previous hmp domain
          */
+        /* ==STEP 1==
+         *  如果进程 se 是新创建的进程, 首先检查是否有空闲的 CPU 以供运行
+         *  优先放到空闲的大核 CPU 上运行, 其次是空闲的小核 CPU
+         *
+         *  如果不是新创建的进程或者没有空闲的CPU,
+         *  则转移到STEP-2 */
         step = 1;
         if (task_created(sd_flag) && !task_low_priority(p->prio)) {
-                if (!rq_length(B_target))
+                if (!rq_length(B_target))       /* 大核 cpu 当前空闲 */
                         goto select_fast;
-                if (!rq_length(L_target))
+                if (!rq_length(L_target))       /* 小核 cpu 当前空闲 */
                         goto select_slow;
         }
         memset(&clbenv, 0, sizeof(clbenv));
@@ -8866,21 +8947,35 @@ static int hmp_select_task_rq_fair(int sd_flag, struct task_struct *p,
         clbenv.ltarget = L_target;
         clbenv.btarget = B_target;
         sched_update_clbstats(&clbenv);
+
+        /* ==STEP 2==
+         *  检查当前进程 se 是否满足迁移到大核 CPU(B_target) 上的条件
+         *  如果符合要求, 则跳转到 select_fast标签,
+         *  选择大核 CPU(B_target) 供其运行 */
         step = 2;
         if (hmp_up_migration(L_target, &B_target, se, &clbenv))
                 goto select_fast;
+        /* ==STEP 3==
+         *  检查当前进程 se 是否满足迁移到小核 CPU(L_target) 上的条件
+         *  如果符合要求, 则跳转到 select_slow标签,
+         *  选择小核 CPU(L_target) 供其运行 */
         step = 3;
         if (hmp_down_migration(B_target, &L_target, se, &clbenv))
                 goto select_slow;
+        /* ==STEP 4==
+         *  如果前述三个条件都不满足,
+         *  说明我们找不到合适的其他 CPU 供其运行
+         *  那么我们就维持原状, 让其保持在原来的 CPU(prev) 上运行
+         * */
         step = 4;
         if (hmp_cpu_is_slow(prev_cpu))
                 goto select_slow;
         goto select_fast;
 
-select_fast:
+select_fast:    /*  选择大核 CPU(B_target) 供调度实体 se 运行  */
         new_cpu = B_target;
         goto out;
-select_slow:
+select_slow:    /*  选择小核 CPU(L_target) 供调度实体 se 运行  */
         new_cpu = L_target;
         goto out;
 
