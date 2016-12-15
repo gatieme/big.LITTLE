@@ -8528,11 +8528,83 @@ static DEFINE_SPINLOCK(hmp_force_migration);
 ////////////////////////////////////////////////////////////////////////////////
 
 
-/////////////////////
+/////////////////////////////////////////////////
+// ============================================
 // common functions for HMP and HMP_ENHANCEMENT
-/////////////////////
+// ============================================
+//
+//
+// static int hmp_active_task_migration_cpu_stop(void *data)
+//
+// static int hmp_can_migrate_task(struct task_struct *p, struct lb_env *env)
+//
+// static int move_specific_task(struct lb_env *env, struct task_struct *pm)
+/////////////////////////////////////////////////
 
 
+
+/////////////////////////////////////////////////
+// =====================================
+// special functions for HMP_ENHANCEMENT
+// =====================================
+//
+//
+// static int hmp_up_stable(int cpu);
+// static int hmp_down_stable(int cpu)
+//
+// static unsigned int hmp_up_migration(int cpu,
+//                                      int *target_cpu,
+//                                      struct sched_entity *se,
+//                                      struct clb_env *clbenv);
+// static unsigned int hmp_down_migration(int cpu,
+//                                      int *target_cpu,
+//                                      struct sched_entity *se,
+//                                      struct clb_env *clbenv);
+//
+// static unsigned int hmp_select_cpu(unsigned int caller,
+//                                      struct task_struct *p,
+//                                      struct cpumask *mask,
+//                                      int prev)
+// static int hmp_select_task_rq_fair(int sd_flag,
+//                                      struct task_struct *p,
+//                                      int prev_cpu,
+//                                      int new_cpu)
+//
+// static inline void hmp_dynamic_threshold(struct clb_env *clbenv)
+//
+// static void hmp_force_down_migration(int this_cpu)
+// static void hmp_force_up_migration(int this_cpu)
+//
+// static unsigned int hmp_idle_pull(int this_cpu)
+/////////////////////////////////////////////////
+
+
+/////////////////////////////////////////////////
+// =========================
+// special functions for HMP
+// =========================
+//
+//
+// static unsigned int hmp_task_eligible_for_up_migration(struct sched_entity *se)
+//
+// static unsigned int hmp_up_migration(int cpu, int *target_cpu, struct sched_entity *se)
+//
+// static unsigned int hmp_down_migration(int cpu, struct sched_entity *se)
+//
+// static void hmp_migrate_runnable_task(struct rq *rq)
+//
+// static void hmp_force_up_migration(int this_cpu)
+//
+// static unsigned int hmp_idle_pull(int this_cpu)
+/////////////////////////////////////////////////
+
+
+
+
+
+/////////////////////////////////////////////////
+// common functions for HMP and HMP_ENHANCEMENT
+/////////////////////////////////////////////////
 /*
  * hmp_active_task_migration_cpu_stop is run by cpu stopper and used to
  * migrate a specific task from one runqueue to another.
