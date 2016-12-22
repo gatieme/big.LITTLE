@@ -1,0 +1,353 @@
+menu "Linaro mp schudeler"
+
+#----------------------------------------------
+# linaro's configs for CONFIG_SCHED_HMP
+#----------------------------------------------
+config DISABLE_CPU_SCHED_DOMAIN_BALANCE
+        bool "(LINARO-HMP) Disable CPU level scheduler load-balancing"
+        ---help---
+          Disables scheduler load-balancing at CPU sched domain level.
+
+config SCHED_HMP
+        bool "(LINARO-HMP) Heterogenous multiprocessor scheduling"
+        depends on DISABLE_CPU_SCHED_DOMAIN_BALANCE && SCHED_MC && FAIR_GROUP_SCHED && !SCHED_AUTOGROUP
+        help
+          Experimental scheduler optimizations for heterogeneous platforms.
+          Attempts to introspectively select task affinity to optimize power
+          and performance. Basic support for multiple (>2) cpu types is in place,
+          but it has only been tested with two types of cpus.
+          There is currently no support for migration of task groups, hence
+          !SCHED_AUTOGROUP. Furthermore, normal load-balancing must be disabled
+          between cpus of different type (DISABLE_CPU_SCHED_DOMAIN_BALANCE).
+          When turned on, this option adds sys/kernel/hmp directory which
+          contains the following files:
+          up_threshold - the load average threshold used for up migration
+                                         (0 - 1023)
+          down_threshold - the load average threshold used for down migration
+                                         (0 - 1023)
+          hmp_domains - a list of cpumasks for the present HMP domains,
+                                        starting with the 'biggest' and ending with the
+                                        'smallest'.
+          Note that both the threshold files can be written at runtime to
+          control scheduler behaviour.
+
+config SCHED_HMP_PRIO_FILTER
+        bool "(LINARO-HMP) Filter HMP migrations by task priority"
+        depends on SCHED_HMP
+        help
+          Enables task priority based HMP migration filter. Any task with
+          a NICE value above the threshold will always be on low-power cpus
+          with less compute capacity.
+
+config SCHED_HMP_PRIO_FILTER_VAL
+        int "(LINARO-HMP) NICE priority threshold"
+        default 5
+        depends on SCHED_HMP_PRIO_FILTER
+
+config HMP_FAST_CPU_MASK
+        string "(LINARO-HMP) HMP scheduler fast CPU mask"
+        depends on SCHED_HMP
+        ---help---
+          Leave empty to use device tree information.
+          specify the cpuids of the fast CPUs in the system as a list string,
+          eg. cpuid 0+1 should be specified as 0-1.
+
+config HMP_SLOW_CPU_MASK
+        string "(LINARO-HMP) HMP scheduler slow CPU mask"
+        depends on SCHED_HMP
+        help
+          Leave empty to use device tree information.
+          Specify the cpuids of the slow CPUs in the system as a list string,
+          eg. cpuid 0+1 should be specified as 0-1.
+
+
+config HMP_SYSFS_INTERFACE
+        bool "(LINARO-HMP) Allows get hmp information through sysfs"
+        depends on SCHED_HMP
+        help
+          These functions allow to change the growing speed of the load_avg_ratio
+          by default it goes from 0 to 0.5 in LOAD_AVG_PERIOD = 32ms
+          This can now be changed with /sys/kernel/hmp/load_avg_period_ms.
+
+          These functions also allow to change the up and down threshold of HMP
+          using /sys/kernel/hmp/{up,down}_threshold.
+          Both must be between 0 and 1023. The threshold that is compared
+          to the load_avg_ratio is up_threshold/1024 and down_threshold/1024.
+
+          For instance, if load_avg_period = 64 and up_threshold = 512, an idle
+          task with a load of 0 will reach the threshold after 64ms of busy loop.
+
+          Changing load_avg_periods_ms has the same effect than changing the
+          default scaling factor Y=1002/1024 in the load_avg_ratio computation to
+          (1002/1024.0)^(LOAD_AVG_PERIOD/load_avg_period_ms), but the last one
+          could trigger overflows.
+          For instance, with Y = 1023/1024 in __update_task_entity_contrib()
+          "contrib = se->avg.runnable_avg_sum * scale_load_down(se->load.weight);"
+          could be overflowed for a weight > 2^12 even is the load_avg_contrib
+          should still be a 32bits result. This would not happen by multiplicating
+          delta time by 1/22 and setting load_avg_period_ms = 706.
+
+
+config HMP_VARIABLE_SCALE
+        bool "(LINARO-HMP) Allows changing the load tracking scale through sysfs"
+        depends on SCHED_HMP && HMP_SYSFS_INTERFACE
+        help
+          When turned on, this option exports the load average period value
+          for the load tracking patches through sysfs.
+          The values can be modified to change the rate of load accumulation
+          used for HMP migration. 'load_avg_period_ms' is the time in ms to
+          reach a load average of 0.5 for an idle task of 0 load average
+          ratio which becomes 100% busy.
+          For example, with load_avg_period_ms = 128 and up_threshold = 512,
+          a running task with a load of 0 will be migrated to a bigger CPU after
+          128ms, because after 128ms its load_avg_ratio is 0.5 and the real
+          up_threshold is 0.5.
+          This patch has the same behavior as changing the Y of the load
+          average computation to
+                        (1002/1024)^(LOAD_AVG_PERIOD/load_avg_period_ms)
+          but removes intermediate overflows in computation.
+
+
+config HMP_FREQUENCY_INVARIANT_SCALE
+        bool "(LINARO-HMP) Frequency-Invariant Tracked Load for HMP"
+        depends on SCHED_HMP && CPU_FREQ #&& !(ARCH_SCALE_INVARIANT_CPU_CAPACITY)
+        help
+          Scales the current load contribution in line with the frequency
+          of the CPU that the task was executed on.
+          In this version, we use a simple linear scale derived from the
+          maximum frequency reported by CPUFreq.
+          Restricting tracked load to be scaled by the CPU's frequency
+          represents the consumption of possible compute capacity
+          (rather than consumption of actual instantaneous capacity as
+          normal) and allows the HMP migration's simple threshold
+          migration strategy to interact more predictably with CPUFreq's
+          asynchronous compute capacity changes.
+
+config SCHED_HMP_LITTLE_PACKING
+        bool "(LINARO-HMP) Small task packing for HMP"
+        depends on SCHED_HMP
+        default n
+        help
+          Allows the HMP Scheduler to pack small tasks into CPUs in the
+          smallest HMP domain.
+          Controlled by two sysfs files in sys/kernel/hmp.
+          packing_enable: 1 to enable, 0 to disable packing. Default 1.
+          packing_limit: runqueue load ratio where a RQ is considered
+          to be full. Default is NICE_0_LOAD * 9/8.
+
+
+
+endmenu #       "Linaro mp schudeler"
+
+
+menu "big.LITTLE Hmp schudeler enhancement by HIT-FTCL"
+
+#----------------------------------------------
+# pack configs for CONFIG_SCHED_HMP
+#----------------------------------------------
+config HMP_TRACER
+        bool "(EXPERIMENTAL-HMP) Profile HMP scheduler"
+        depends on SCHED_HMP
+        help
+          Profile HMP scheduler
+
+config HEVTASK_INTERFACE
+        bool "(EXPERIMENTAL-HMP)task status interface"
+        help
+          The option provide an interface to show task status
+
+config ARCH_SCALE_INVARIANT_CPU_CAPACITY
+        bool "(EXPERIMENTAL-HMP) Scale-Invariant CPU Compute Capacity Recording"
+        depends on SCHED_HMP && CPU_FREQ && USE_OF && !(HMP_FREQUENCY_INVARIANT_SCALE)
+        help
+          Provides a new measure of maximum and instantaneous CPU compute
+          capacity, derived from a table of relative compute performance
+          for each core type present in the system. The table is an
+          estimate and specific core performance may be different for
+          any particular workload. The measure includes the relative
+          performance and a linear scale of current to maximum frequency
+          such that at maximum frequency (as expressed in the DTB) the
+          reported compute capacity will be equal to the estimated
+          performance from the table. Values range between 0 and 1023 where
+          1023 is the highest capacity available in the system.
+
+config HMP_DELAY_UP_MIGRATION
+        bool "(EXPERIMENTAL-HMP) Delay migration task from LITTLE to BIG"
+        depends on SCHED_HMP
+        help
+          In this version we have stopped using forced up migrations when we
+          detect that a task running on a little CPU should be moved to a bigger
+          CPU. In most cases, the bigger CPU is in a deep sleep state and a forced
+          migration means we stop the task immediately but need to wait for the
+          target CPU to wake up before we can restart the task which is being
+          moved. Instead, we now wake a big CPU with an IPI and ask it to pull
+          a task when ready. This allows the task to continue executing on its
+          current CPU, reducing the amount of time that the task is stalled for.
+
+config HMP_PACK_STOP_MACHINE
+        bool "(EXPERIMENTAL-HMP) Packing HMP-stop machine"
+        depends on SCHED_HMP
+        help
+          This option enables Packing stop machine at the time of need
+          add by gatieme(ChengJean) @ 2012-12-03 22:16 for support CONFIG_SCHED_HMP_ENHANCEMENT
+          modify by gatieme(ChengJean) @ 2012-12-07 18:10 for support CONFIG_SCHED_HMP
+
+
+#menu "bit.LITTLE mpcb scheduler enhancement by HIT-FTCL"
+#----------------------------------------------
+# pack configs for CONFIG_SCHED_HMP_ENHANCEMENT
+#----------------------------------------------
+
+
+config SCHED_HMP_ENHANCEMENT
+        bool "(EXPERIMENTAL-HMPCB) HMP Ennhancement"
+        depends on SCHED_HMP
+        help
+          HMP Ennhancement
+
+config MET_SCHED_HMP
+        bool "(EXPERIMENTAL-HMPCB) MET SCHED HMP Info"
+        depends on SCHED_HMP_ENHANCEMENT && HMP_TRACER && SCHED_DEBUG
+        help
+          MET SCHED HMP Info
+
+config HMP_DYNAMIC_THRESHOLD
+        bool "(EXPERIMENTAL-HMPCB) Dynamically adjust task migration threshold"
+        depends on SCHED_HMP_ENHANCEMENT
+        help
+          Dynamically adjust task migration threshold according to current system load
+
+config HMP_GLOBAL_BALANCE
+        bool "(EXPERIMENTAL-HMPCB) Enhance HMP global load balance"
+        depends on SCHED_HMP_ENHANCEMENT
+        help
+          Enhance HMP global load balance
+
+config HMP_TASK_ASSIGNMENT
+        bool "(EXPERIMENTAL-HMPCB) Enhance HMP task assignment"
+        depends on SCHED_HMP_ENHANCEMENT
+        help
+          Enhance HMP task assignment
+
+config HMP_DISCARD_CFS_SELECTION_RESULT
+        bool "(EXPERIMENTAL-HMPCB) Discard CFS runqueue selection result"
+        depends on SCHED_HMP_ENHANCEMENT && HMP_TASK_ASSIGNMENT
+        help
+          Discard CFS runqueue selection result even if only one cluster exists
+
+config HMP_PACK_SMALL_TASK
+        bool "(EXPERIMENTAL-HMPCB) Packing Small Tasks"
+        depends on SCHED_HMP_ENHANCEMENT && !SCHED_HMP_LITTLE_PACKING
+        help
+          This option enables Packing Small Tasks
+
+config HMP_PACK_BUDDY_INFO
+        bool "(EXPERIMENTAL-HMPCB) Packing Small Tasks Buddy Information Log"
+        depends on SCHED_HMP_ENHANCEMENT && HMP_PACK_SMALL_TASK
+        help
+          This option enables Packing Small Tasks Buddy Information Log
+
+
+config HMP_LAZY_BALANCE
+        bool "(EXPERIMENTAL-HMPCB) Lazy Balance"
+        depends on SCHED_HMP_ENHANCEMENT && HMP_PACK_SMALL_TASK
+        help
+          This option enables Lazy Balance
+
+config HMP_POWER_AWARE_CONTROLLER
+        bool "(EXPERIMENTAL-HMPCB) Power-aware Scheduler for b.L MP Controller"
+        depends on SCHED_HMP_ENHANCEMENT && HMP_PACK_SMALL_TASK && HMP_LAZY_BALANCE
+        help
+          Power-aware scheduler for b.L MP controller and status interface
+
+config HMP_PACK_LB_ENV
+                bool "(EXPERIMENTAL-HMPCB) LB environment enhancement for B.L MP Cobtroller"
+        depends on SCHED_HMP_ENHANCEMENT
+        help
+          lb_env enhancement for b.L MP controller
+
+#endmenu #"bit.LITTLE mpcb scheduler enhancement by HIT-FTCL"
+
+endmenu #"Linaro mp schudeler enhancement by HIT-FTCL"
+
+
+menu "Debug hmp scheduler"
+
+config DEBUG_SCHED_HMP
+        bool "Debug information for HMP scheduler"
+        depends on SCHED_HMP
+        help
+          If you say y here, you can use hmp_dgb and hmp_
+                hmp_debug(format, args...) used as printk
+
+                hmp_dbginfo(format, args...) used ad print file and line
+
+config DEBUG_SCHED_HMP_FUNC
+        bool "Debug the execution route of the all hmp function"
+        depends on SCHED_HMP
+        help
+          if you say y here, kernel will show your execution route of function
+                hmp_func_debug(FUNC_DEBUG_FLAG_START)
+
+                hmp_func_debug(FUNC_DEBUG_FLAG_END)
+
+
+
+config DEBUG_SCHED_HMP_CODE
+        bool "Logic information for the HMP scheduler"
+        depends on SCHED_HMP
+        help
+          if you sayy here, kernel will show your logic information of the HMP
+                hmp_code_debug
+
+endmenu #"Debug hmp scheduler"
+
+
+
+if ARCH_SUN8IW6
+
+menu "big.LITTLE mp scheduler enhancement by SUNXI"
+#----------------------------------------------
+# pack configs for SUNXI
+#----------------------------------------------
+
+config SCHED_DCMP
+        bool "Dual Cluster symmetric support"
+        depends on ARCH_SUN8IW6
+        default n
+        help
+          Allows the Dual cluster symmetric
+
+config SCHED_HMP_DCMP
+        bool "(EXPERIMENTAL) Heterogenous multiprocessor scheduling for DCMP"
+        depends on SCHED_HMP && SCHED_DCMP
+        help
+          Experimental scheduler optimizations for heterogeneous platforms for DCMP
+
+config SCHED_SMP_DCMP
+        bool "(EXPERIMENTAL) SMP scheduling for DCMP"
+        depends on !SCHED_HMP && SCHED_DCMP
+        help
+          Experimental SMP scheduling for DCMP
+
+config CLUSTER0_CPU_MASK
+        string "Cluster0 mask for Dual Cluster"
+        depends on SCHED_SMP_DCMP
+        help
+          Leave empty to use device tree information. Specify
+          the cpuids of the fast CPUs in the system as a list string, eg.
+          cpuid 0+1 should be specified as 0-1.
+
+config CLUSTER1_CPU_MASK
+        string "Cluster1 mask for Dual Cluster"
+        depends on SCHED_SMP_DCMP
+        help
+          Leave empty to use device tree information.
+          Specify the cpuids of the fast CPUs in the system as a list string,
+          eg. cpuid 0+1 should be specified as 0-1.
+
+endmenu #"bit.LITTLE mp scheduler enhancement by SUNXI"
+
+endif
+
+
